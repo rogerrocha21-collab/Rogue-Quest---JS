@@ -103,7 +103,13 @@ export const TRANSLATIONS: Record<Language, any> = {
     theme_void: 'O Vazio',
     final_stats: "ESTATÍSTICAS FINAIS",
     blood: "SANGUE",
-    key: "OK"
+    key: "CHAVE",
+    combat_dealt: "causou",
+    combat_damage: "de dano",
+    combat_absorbed: "absorveu",
+    combat_player: "Você",
+    combat_enemy: "Inimigo",
+    combat_pet: "Mascote"
   },
   EN: {
     hero_placeholder: "HERO NAME",
@@ -146,7 +152,13 @@ export const TRANSLATIONS: Record<Language, any> = {
     theme_void: 'The Void',
     final_stats: "FINAL STATS",
     blood: "BLOOD",
-    key: "OK"
+    key: "KEY",
+    combat_dealt: "dealt",
+    combat_damage: "damage",
+    combat_absorbed: "absorbed",
+    combat_player: "You",
+    combat_enemy: "Enemy",
+    combat_pet: "Pet"
   },
   ES: {
     hero_placeholder: "NOMBRE DEL HÉROE",
@@ -189,6 +201,12 @@ export const TRANSLATIONS: Record<Language, any> = {
     theme_void: 'El Vacío',
     final_stats: "ESTADÍSTICAS FINALES",
     blood: "SANGRE",
-    key: "OK"
+    key: "LLAVE",
+    combat_dealt: "causó",
+    combat_damage: "de daño",
+    combat_absorbed: "absorbió",
+    combat_player: "Tú",
+    combat_enemy: "Enemigo",
+    combat_pet: "Mascota"
   }
 };

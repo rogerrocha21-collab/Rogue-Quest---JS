@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Enemy, EntityStats, StatChoice, PotionEntity, ItemEntity, Pet, Language } from '../types';
 import { Icon } from './Icons';
 import { ITEM_POOL, TRANSLATIONS } from '../constants';
@@ -20,7 +20,19 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
   const [isDone, setIsDone] = useState(false);
   const [lastAttacker, setLastAttacker] = useState<'player' | 'enemy' | 'pet' | null>(null);
   const [isTakingDamage, setIsTakingDamage] = useState<'player' | 'enemy' | 'pet' | null>(null);
+  const [combatLogs, setCombatLogs] = useState<string[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const t = TRANSLATIONS[language];
+
+  const addLog = (msg: string) => {
+    setCombatLogs(prev => [...prev, msg]);
+  };
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [combatLogs]);
 
   useEffect(() => {
     let p = { ...currentPStats };
@@ -30,6 +42,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
     const resolveTurn = () => {
       if (p.hp <= 0 || e.hp <= 0) { setIsDone(true); return; }
       const executeSequence = async () => {
+        // Turno do Pet (se houver)
         if (activePet && curPetHp > 0) {
             setLastAttacker('pet');
             setIsTakingDamage('enemy');
@@ -37,38 +50,56 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
             const petAtk = Math.max(1, Math.floor(p.attack / 2));
             e.hp -= petAtk;
             if (e.hp < 0) e.hp = 0;
+            
+            addLog(`${t.combat_pet} ${t.combat_dealt} ${petAtk} ${t.combat_damage}`);
+            
             setCurrentEStats({ ...e });
             await new Promise(r => setTimeout(r, 400));
             setIsTakingDamage(null);
             if (e.hp <= 0) { setIsDone(true); return; }
         }
+
         const playersTurn = p.speed >= e.speed;
         const turnOrder = playersTurn ? ['player', 'enemy'] : ['enemy', 'player'];
+
         const processSide = async (side: 'player' | 'enemy') => {
             if (p.hp <= 0 || e.hp <= 0) return;
             let atkValue = side === 'player' ? p.attack : e.attack;
+            let attackerName = side === 'player' ? t.combat_player : t.combat_enemy;
+            
             setLastAttacker(side);
             setIsTakingDamage(side === 'player' ? 'enemy' : 'player');
             if (onAttackSound) onAttackSound(side);
             setTimeout(() => setIsTakingDamage(null), 200);
+
             let defender = side === 'player' ? e : p;
-            let damage = atkValue;
+            let originalAtk = atkValue;
+            let absorbed = 0;
+
             if (defender.armor > 0) {
-              const absorbed = Math.min(defender.armor, damage);
+              absorbed = Math.min(defender.armor, originalAtk);
               defender.armor -= absorbed;
-              damage -= absorbed;
+              atkValue -= absorbed;
             }
-            if (damage > 0) defender.hp -= damage;
+
+            if (atkValue > 0) defender.hp -= atkValue;
             if (defender.hp < 0) defender.hp = 0;
-            setCurrentPStats({ ...p }); setCurrentEStats({ ...e }); 
+
+            let logMsg = `${attackerName} ${t.combat_dealt} ${originalAtk} ${t.combat_damage}`;
+            if (absorbed > 0) logMsg += ` (${absorbed} ${t.combat_absorbed})`;
+            addLog(logMsg);
+
+            setCurrentPStats({ ...p }); 
+            setCurrentEStats({ ...e }); 
         };
+
         await processSide(turnOrder[0] as any);
         if (p.hp > 0 && e.hp > 0) {
           setTimeout(async () => {
             await processSide(turnOrder[1] as any);
             if (p.hp <= 0 || e.hp <= 0) setIsDone(true);
-            else setTimeout(resolveTurn, 400);
-          }, 400);
+            else setTimeout(resolveTurn, 500);
+          }, 500);
         } else { setIsDone(true); }
       };
       executeSequence();
@@ -78,29 +109,46 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
 
   return (
     <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-6 backdrop-blur-md">
-      <div className="bg-zinc-900 border-2 border-zinc-800 max-w-xl w-full p-8 rounded-3xl shadow-2xl flex flex-col gap-8">
-        <div className="grid grid-cols-2 gap-12 font-mono">
+      <div className="bg-zinc-900 border-2 border-zinc-800 max-w-xl w-full p-6 md:p-8 rounded-3xl shadow-2xl flex flex-col gap-6">
+        <div className="grid grid-cols-2 gap-8 md:gap-12 font-mono">
           <div className={`text-center space-y-4 transition-all duration-200 ${lastAttacker === 'player' ? 'scale-110' : ''} ${isTakingDamage === 'player' ? 'animate-shake' : ''}`}>
-            <div className={`p-6 rounded-2xl border-2 transition-colors relative ${isTakingDamage === 'player' ? 'bg-red-900 border-red-500' : 'bg-zinc-800 border-zinc-700'}`}>
+            <div className={`p-6 rounded-2xl border-2 transition-colors relative ${isTakingDamage === 'player' ? 'bg-red-900/40 border-red-500' : 'bg-zinc-800 border-zinc-700'}`}>
               <span className="text-yellow-400"><Icon.Player /></span>
             </div>
             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
-                <div className="h-full bg-red-500 transition-all" style={{ width: `${(currentPStats.hp / currentPStats.maxHp) * 100}%` }} />
+                <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(currentPStats.hp / currentPStats.maxHp) * 100}%` }} />
             </div>
-            <p className="text-[10px] text-zinc-500 font-bold uppercase">{t.hp}: {currentPStats.hp} {t.armor}: {currentPStats.armor}</p>
+            <p className="text-[10px] text-zinc-500 font-bold uppercase">{t.hp}: <span className="text-white">{currentPStats.hp}</span> {t.armor}: <span className="text-blue-400">{currentPStats.armor}</span></p>
           </div>
+
           <div className={`text-center space-y-4 transition-all duration-200 ${lastAttacker === 'enemy' ? 'scale-110' : ''} ${isTakingDamage === 'enemy' ? 'animate-shake' : ''}`}>
-            <div className={`p-6 rounded-2xl border-2 transition-colors ${enemy.isBoss ? 'bg-red-950 border-red-800' : isTakingDamage === 'enemy' ? 'bg-red-900 border-red-500' : 'bg-zinc-800 border-zinc-700'}`}>
+            <div className={`p-6 rounded-2xl border-2 transition-colors ${enemy.isBoss ? 'bg-red-950 border-red-800' : isTakingDamage === 'enemy' ? 'bg-red-900/40 border-red-500' : 'bg-zinc-800 border-zinc-700'}`}>
               <span className={enemy.isBoss ? 'text-red-500' : 'text-zinc-300'}><Icon.Enemy isBoss={enemy.isBoss} /></span>
             </div>
             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
-                <div className="h-full bg-red-700 transition-all" style={{ width: `${(currentEStats.hp / currentEStats.maxHp) * 100}%` }} />
+                <div className="h-full bg-red-700 transition-all duration-300" style={{ width: `${(currentEStats.hp / currentEStats.maxHp) * 100}%` }} />
             </div>
             <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">{enemy.type}</p>
           </div>
         </div>
+
+        {/* Histórico de Batalha */}
+        <div className="bg-black/50 border border-zinc-800 rounded-xl p-3 h-32 md:h-40 flex flex-col gap-1 overflow-hidden">
+          <div ref={scrollRef} className="overflow-y-auto h-full pr-2 space-y-1 scroll-smooth">
+            {combatLogs.map((log, i) => (
+              <p key={i} className="text-[10px] font-mono leading-tight text-zinc-400 flex gap-2">
+                <span className="text-zinc-600">[{i+1}]</span>
+                <span className={log.includes(t.combat_player) ? 'text-zinc-100' : log.includes(t.combat_pet) ? 'text-orange-400' : 'text-red-400/80'}>
+                  {log}
+                </span>
+              </p>
+            ))}
+            {combatLogs.length === 0 && <p className="text-[10px] text-zinc-600 animate-pulse text-center mt-8">{t.abyss.toUpperCase()}...</p>}
+          </div>
+        </div>
+
         {isDone && (
-          <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 10) + 10, petHp)} className={`w-full font-black py-4 rounded-xl transition-all uppercase text-sm ${currentPStats.hp > 0 ? "bg-green-600 hover:bg-green-500" : "bg-red-700 hover:bg-red-600"}`}>
+          <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 10) + 10, petHp)} className={`w-full font-black py-4 rounded-xl transition-all uppercase text-sm ${currentPStats.hp > 0 ? "bg-green-600 hover:bg-green-500 text-white shadow-[0_0_20px_rgba(22,163,74,0.4)]" : "bg-red-700 hover:bg-red-600 text-white shadow-[0_0_20px_rgba(185,28,28,0.4)]"}`}>
             {currentPStats.hp > 0 ? t.collect_reward : t.succumb}
           </button>
         )}
