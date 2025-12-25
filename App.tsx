@@ -427,23 +427,19 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 flex flex-col items-center p-4 font-mono select-none overflow-x-hidden relative pb-10">
       <div className="max-w-md w-full flex flex-col gap-4 animate-in fade-in duration-700">
-        <header className="flex justify-between items-end border-b border-zinc-900 pb-3">
+        <header className="flex justify-between items-center border-b border-zinc-900 pb-3">
           <div className="flex flex-col">
-            <h1 className="text-3xl font-black text-white tracking-tighter uppercase leading-none">
+            <h1 className="text-2xl font-black text-white tracking-tighter uppercase leading-none">
               ROGUE<span className="text-red-600">QUEST</span>
             </h1>
-            <div className="flex items-center gap-2 mt-1.5">
-              <h2 className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">{currentTheme.name}</h2>
-              <span className="text-zinc-800 text-[10px] font-bold">|</span>
-              <h3 className="text-zinc-400 text-[10px] font-bold uppercase">Nível {gameState.level}</h3>
-            </div>
+            <h2 className="text-zinc-500 text-[9px] font-bold uppercase tracking-[0.2em] mt-1.5">
+              {currentTheme.name} — Nível {gameState.level}
+            </h2>
             {gameState.tronModeActive && (
-              <div className="text-cyan-400 text-[10px] font-black animate-pulse mt-2 flex items-center gap-1.5">
-                <Icon.Boot /> MOTO TRON: {gameState.tronTimeLeft}s
-              </div>
+              <div className="text-cyan-400 text-[10px] font-black animate-pulse mt-1">MOTO TRON: {gameState.tronTimeLeft}s</div>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="text-right flex items-center gap-2">
             <button 
               onClick={handleShare}
               className="p-2.5 bg-zinc-900/50 hover:bg-zinc-800 rounded-xl border border-zinc-800 transition-colors text-zinc-400 hover:text-white"
