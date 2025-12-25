@@ -56,8 +56,8 @@ const GameMap: React.FC<GameMapProps> = ({ map, theme, playerPos, enemies, chest
             {tronModeActive ? <Icon.Boot /> : <Icon.Player />}
           </span>
         ) : isPet ? (
-          <span className={`${TILE_COLORS.PET} animate-player-bounce z-10 scale-90`}>
-            {activePet.type === 'LOBO' ? <Icon.Wolf /> : <Icon.Puma />}
+          <span className={`${TILE_COLORS.PET} animate-pet-wiggle z-10 scale-90`}>
+            {activePet.type === 'LOBO' ? <Icon.Wolf /> : activePet.type === 'PUMA' ? <Icon.Puma /> : <Icon.Owl />}
           </span>
         ) : enemy ? (
           <span className={`${TILE_COLORS.ENEMY} drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] z-10`}><Icon.Enemy /></span>

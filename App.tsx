@@ -204,6 +204,26 @@ const App: React.FC = () => {
     setGameState({ ...gameState, playerPos: { x: nx, y: ny }, tronTrail: tronModeActive ? [...tronTrail, playerPos] : tronTrail, activePet: activePet ? { ...activePet, pos: playerPos } : undefined });
   };
 
+  const handleTileClick = (tx: number, ty: number) => {
+    if (!gameState || gameState.gameStatus !== 'PLAYING') return;
+    const { playerPos } = gameState;
+    const dx = tx - playerPos.x;
+    const dy = ty - playerPos.y;
+
+    if (dx === 0 && dy === 0) return;
+
+    let moveX = 0;
+    let moveY = 0;
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      moveX = dx > 0 ? 1 : -1;
+    } else {
+      moveY = dy > 0 ? 1 : -1;
+    }
+
+    movePlayer(moveX, moveY);
+  };
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
@@ -236,10 +256,9 @@ const App: React.FC = () => {
             disabled={!nameInput.trim()}>
             {hasSavedGame ? t.new_game : t.start_journey}
           </button>
-          <a href="https://t.me/rurocoli" target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded-xl transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-            <Icon.MessageCircle /> {t.feedback}
+          <a href="https://t.me/rurocoli" target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded-xl transition-all text-[10px] uppercase tracking-widest flex items-center justify-center">
+            {t.feedback}
           </a>
-          {/* Flags de Idioma */}
           <div className="flex justify-center gap-6 mt-4 pt-4 border-t border-zinc-800">
             <button onClick={() => setCurrentLang('PT')} className={`text-2xl transition-transform ${currentLang === 'PT' ? 'scale-125 border-b-2 border-red-600' : 'opacity-40 hover:opacity-100'}`} title="Português">🇧🇷</button>
             <button onClick={() => setCurrentLang('EN')} className={`text-2xl transition-transform ${currentLang === 'EN' ? 'scale-125 border-b-2 border-red-600' : 'opacity-40 hover:opacity-100'}`} title="English">🇺🇸</button>
@@ -274,7 +293,7 @@ const App: React.FC = () => {
           enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions}
           items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} hasKey={gameState.hasKey}
           stairsPos={gameState.stairsPos} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail}
-          activePet={gameState.activePet} onTileClick={movePlayer as any}
+          activePet={gameState.activePet} onTileClick={handleTileClick}
         />
         <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} />
         
@@ -284,7 +303,6 @@ const App: React.FC = () => {
             <h2 className="text-6xl font-black text-red-600 mb-2 italic tracking-tighter drop-shadow-[0_0_50px_rgba(220,38,38,0.8)] uppercase">{t.death_title}</h2>
             <p className="text-zinc-500 mb-8 uppercase text-[10px] tracking-[0.4em] animate-pulse text-center">{t.death_desc}</p>
             
-            {/* Estatísticas Finais para Screenshot */}
             <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-xs mb-8 space-y-3 shadow-[0_0_30px_rgba(0,0,0,1)]">
                <h3 className="text-zinc-400 text-center font-black text-xs border-b border-zinc-800 pb-2 mb-4 uppercase">{t.final_stats}</h3>
                <div className="flex justify-between text-[10px] font-bold"><span>{t.level.toUpperCase()}</span><span className="text-white">{gameState.level}</span></div>
@@ -331,8 +349,8 @@ const App: React.FC = () => {
       {gameState.gameStatus === 'MERCHANT_SHOP' && (
         <MerchantShopModal language={currentLang} gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} onClose={() => setGameState({...gameState, gameStatus: 'PLAYING'})} onBuyPet={(type) => {
           playChime();
-          const newPet: Pet = { type, name: type === 'LOBO' ? 'Wolf' : 'Puma', hp: 60, maxHp: 60, pos: { x: gameState.playerPos.x - 1, y: gameState.playerPos.y } };
-          const nextState: GameState = { ...gameState, gold: gameState.gold - 10, activePet: newPet, logs: [...gameState.logs, t.bought_pet] };
+          const newPet: Pet = { type, name: type === 'LOBO' ? 'Wolf' : type === 'PUMA' ? 'Puma' : 'Owl', hp: 60, maxHp: 60, pos: { x: gameState.playerPos.x - 1, y: gameState.playerPos.y } };
+          const nextState: GameState = { ...gameState, gold: gameState.gold - (type === 'CORUJA' ? 12 : 10), activePet: newPet, logs: [...gameState.logs, t.bought_pet] };
           setGameState(nextState); saveGame(nextState);
         }} onBuyPotion={(p) => {
           const heal = Math.floor(gameState.playerStats.maxHp * (p.percent / 100));

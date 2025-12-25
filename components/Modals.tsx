@@ -109,7 +109,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
   );
 };
 
-export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: boolean, language?: Language, onBuyItem: (item: ItemEntity) => void, onBuyPotion: (pot: PotionEntity) => void, onRentTron: () => void, onBuyPet: (type: 'LOBO' | 'PUMA') => void, onClose: () => void}> = ({ gold, level, hasPet, language = 'PT', onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose }) => {
+export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: boolean, language?: Language, onBuyItem: (item: ItemEntity) => void, onBuyPotion: (pot: PotionEntity) => void, onRentTron: () => void, onBuyPet: (type: 'LOBO' | 'PUMA' | 'CORUJA') => void, onClose: () => void}> = ({ gold, level, hasPet, language = 'PT', onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose }) => {
   const potions = [{ id: 'p1', percent: 20, price: 10, x: 0, y: 0 }, { id: 'p2', percent: 40, price: 20, x: 0, y: 0 }, { id: 'p3', percent: 70, price: 35, x: 0, y: 0 }];
   const [offeredItems, setOfferedItems] = useState<ItemEntity[]>([]);
   const t = TRANSLATIONS[language];
@@ -129,9 +129,10 @@ export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: b
             </div>
         </div>
         {!hasPet && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button disabled={gold < 10} onClick={() => onBuyPet('LOBO')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Wolf /><span className="text-[10px] font-bold text-white mt-1">WOLF</span><span className="text-[9px] text-yellow-500">10G</span></button>
             <button disabled={gold < 10} onClick={() => onBuyPet('PUMA')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Puma /><span className="text-[10px] font-bold text-white mt-1">PUMA</span><span className="text-[9px] text-yellow-500">10G</span></button>
+            <button disabled={gold < 12} onClick={() => onBuyPet('CORUJA')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Owl /><span className="text-[10px] font-bold text-white mt-1">OWL</span><span className="text-[9px] text-yellow-500">12G</span></button>
           </div>
         )}
         <div className="grid grid-cols-3 gap-2">
@@ -183,7 +184,7 @@ export const TutorialModal: React.FC<{onFinish: () => void, language?: Language}
   const current = slides[step];
   return (
     <div className="fixed inset-0 bg-black/98 flex items-center justify-center z-[100] p-6 backdrop-blur-xl">
-      <div className="bg-zinc-900 border-2 border-zinc-800 max-w-sm w-full p-8 rounded-[2.5rem] text-center shadow-2xl flex flex-col items-center">
+      <div className="bg-zinc-900 border-2 border-zinc-800 max-sm w-full p-8 rounded-[2.5rem] text-center shadow-2xl flex flex-col items-center">
         <div className="w-20 h-20 bg-zinc-800 rounded-full flex items-center justify-center text-red-500 mb-6 border-2 border-zinc-700 animate-pulse">{current.icon}</div>
         <h2 className="text-xl font-black text-white mb-4 uppercase tracking-tighter">{current.title}</h2>
         <p className="text-zinc-400 text-xs leading-relaxed mb-10 h-24 flex items-center justify-center">{current.desc}</p>

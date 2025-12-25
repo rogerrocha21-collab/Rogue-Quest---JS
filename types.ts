@@ -46,7 +46,7 @@ export interface PotionEntity extends Position {
 }
 
 export interface Pet {
-  type: 'LOBO' | 'PUMA';
+  type: 'LOBO' | 'PUMA' | 'CORUJA';
   name: string;
   hp: number;
   maxHp: number;
