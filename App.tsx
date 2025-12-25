@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameState, Position, EntityStats, StatChoice, LevelTheme, ItemEntity, PotionEntity, Pet, Language } from './types';
 import { INITIAL_PLAYER_STATS, MAX_LEVELS, MAP_WIDTH, MAP_HEIGHT, THEME_CONFIG, TRANSLATIONS } from './constants';
@@ -358,9 +357,12 @@ const App: React.FC = () => {
         {gameState.gameStatus === 'NEXT_LEVEL' && (
           <div className="fixed inset-0 bg-black flex flex-col items-center justify-center p-8 z-[100] animate-in fade-in duration-500">
              <div className="text-center">
-              <h2 className="text-2xl font-black text-zinc-700 mb-2 animate-pulse uppercase">...</h2>
-              <p className="text-zinc-900 text-[10px] tracking-[0.8em] uppercase font-bold">{t.depth.toUpperCase()} {gameState.level + 1}</p>
-              <button onClick={() => initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet)} className="mt-8 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 px-8 py-3 rounded-lg font-bold uppercase text-[10px] transition-all">OK</button>
+              <h2 className="text-3xl font-black text-red-600 mb-6 animate-pulse uppercase tracking-tighter drop-shadow-[0_0_15px_rgba(220,38,38,0.5)] italic">
+                {t.descending} {gameState.level + 1}
+              </h2>
+              <button onClick={() => initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet)} className="bg-white text-black px-16 py-4 rounded-full font-black hover:scale-105 transition-all text-sm uppercase tracking-widest shadow-2xl">
+                OK
+              </button>
             </div>
           </div>
         )}

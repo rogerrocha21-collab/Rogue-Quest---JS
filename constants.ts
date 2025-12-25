@@ -1,4 +1,3 @@
-
 import { LevelTheme, Language } from './types';
 
 export const MAP_WIDTH = 45; 
@@ -114,7 +113,8 @@ export const TRANSLATIONS: Record<Language, any> = {
     pet_puma: "PUMA",
     pet_coruja: "CORUJA",
     pet_cavalo: "CAVALO",
-    buy_horse: "ALUGAR CAVALO"
+    buy_horse: "ALUGAR CAVALO",
+    descending: "Descendo para o nível"
   },
   EN: {
     hero_placeholder: "HERO NAME",
@@ -168,7 +168,8 @@ export const TRANSLATIONS: Record<Language, any> = {
     pet_puma: "PUMA",
     pet_coruja: "OWL",
     pet_cavalo: "HORSE",
-    buy_horse: "RENT HORSE"
+    buy_horse: "RENT HORSE",
+    descending: "Descending to level"
   },
   ES: {
     hero_placeholder: "NOMBRE DEL HÉROE",
@@ -222,6 +223,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     pet_puma: "PUMA",
     pet_coruja: "BÚHO",
     pet_cavalo: "CABALLO",
-    buy_horse: "ALQUILAR CABALLO"
+    buy_horse: "ALQUILAR CABALLO",
+    descending: "Descendiendo al nivel"
   }
 };
