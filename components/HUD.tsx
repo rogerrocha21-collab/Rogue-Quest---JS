@@ -51,7 +51,7 @@ const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, play
             <h3 className="text-zinc-500 uppercase text-[8px] font-bold tracking-widest text-center">{t.level.toUpperCase()} {level} / ?</h3>
             {activePet && (
               <div className="flex items-center gap-1 text-orange-400 animate-pulse">
-                {activePet.type === 'LOBO' ? <Icon.Wolf /> : <Icon.Puma />}
+                {activePet.type === 'LOBO' ? <Icon.Wolf /> : activePet.type === 'PUMA' ? <Icon.Puma /> : <Icon.Owl />}
                 <span className="text-[8px] font-bold">{activePet.hp}/{activePet.maxHp}</span>
               </div>
             )}

@@ -349,7 +349,8 @@ const App: React.FC = () => {
       {gameState.gameStatus === 'MERCHANT_SHOP' && (
         <MerchantShopModal language={currentLang} gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} onClose={() => setGameState({...gameState, gameStatus: 'PLAYING'})} onBuyPet={(type) => {
           playChime();
-          const newPet: Pet = { type, name: type === 'LOBO' ? 'Wolf' : type === 'PUMA' ? 'Puma' : 'Owl', hp: 60, maxHp: 60, pos: { x: gameState.playerPos.x - 1, y: gameState.playerPos.y } };
+          const petName = type === 'LOBO' ? t.pet_lobo : type === 'PUMA' ? t.pet_puma : t.pet_coruja;
+          const newPet: Pet = { type, name: petName, hp: 60, maxHp: 60, pos: { x: gameState.playerPos.x - 1, y: gameState.playerPos.y } };
           const nextState: GameState = { ...gameState, gold: gameState.gold - (type === 'CORUJA' ? 12 : 10), activePet: newPet, logs: [...gameState.logs, t.bought_pet] };
           setGameState(nextState); saveGame(nextState);
         }} onBuyPotion={(p) => {

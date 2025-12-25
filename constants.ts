@@ -109,7 +109,10 @@ export const TRANSLATIONS: Record<Language, any> = {
     combat_absorbed: "absorveu",
     combat_player: "Você",
     combat_enemy: "Inimigo",
-    combat_pet: "Mascote"
+    combat_pet: "Mascote",
+    pet_lobo: "LOBO",
+    pet_puma: "PUMA",
+    pet_coruja: "CORUJA"
   },
   EN: {
     hero_placeholder: "HERO NAME",
@@ -158,7 +161,10 @@ export const TRANSLATIONS: Record<Language, any> = {
     combat_absorbed: "absorbed",
     combat_player: "You",
     combat_enemy: "Enemy",
-    combat_pet: "Pet"
+    combat_pet: "Pet",
+    pet_lobo: "WOLF",
+    pet_puma: "PUMA",
+    pet_coruja: "OWL"
   },
   ES: {
     hero_placeholder: "NOMBRE DEL HÉROE",
@@ -207,6 +213,9 @@ export const TRANSLATIONS: Record<Language, any> = {
     combat_absorbed: "absorbió",
     combat_player: "Tú",
     combat_enemy: "Enemigo",
-    combat_pet: "Mascota"
+    combat_pet: "Mascota",
+    pet_lobo: "LOBO",
+    pet_puma: "PUMA",
+    pet_coruja: "BÚHO"
   }
 };

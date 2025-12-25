@@ -178,9 +178,9 @@ export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: b
         </div>
         {!hasPet && (
           <div className="grid grid-cols-3 gap-3">
-            <button disabled={gold < 10} onClick={() => onBuyPet('LOBO')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Wolf /><span className="text-[10px] font-bold text-white mt-1">WOLF</span><span className="text-[9px] text-yellow-500">10G</span></button>
-            <button disabled={gold < 10} onClick={() => onBuyPet('PUMA')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Puma /><span className="text-[10px] font-bold text-white mt-1">PUMA</span><span className="text-[9px] text-yellow-500">10G</span></button>
-            <button disabled={gold < 12} onClick={() => onBuyPet('CORUJA')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Owl /><span className="text-[10px] font-bold text-white mt-1">OWL</span><span className="text-[9px] text-yellow-500">12G</span></button>
+            <button disabled={gold < 10} onClick={() => onBuyPet('LOBO')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Wolf /><span className="text-[10px] font-bold text-white mt-1 uppercase">{t.pet_lobo}</span><span className="text-[9px] text-yellow-500">10G</span></button>
+            <button disabled={gold < 10} onClick={() => onBuyPet('PUMA')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Puma /><span className="text-[10px] font-bold text-white mt-1 uppercase">{t.pet_puma}</span><span className="text-[9px] text-yellow-500">10G</span></button>
+            <button disabled={gold < 12} onClick={() => onBuyPet('CORUJA')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Owl /><span className="text-[10px] font-bold text-white mt-1 uppercase">{t.pet_coruja}</span><span className="text-[9px] text-yellow-500">12G</span></button>
           </div>
         )}
         <div className="grid grid-cols-3 gap-2">
