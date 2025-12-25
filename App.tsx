@@ -171,19 +171,25 @@ const App: React.FC = () => {
   };
 
   const handleShare = async () => {
-    const shareData = {
-      title: 'RogueQuest',
-      text: 'Estou explorando o Abismo Infinito! Venha jogar também!',
-      url: 'https://t.me/RogueQuest_bot',
-    };
+    const shareText = `𝗥𝗼𝗴𝘂𝗲 𝗤𝘂𝗲𝘀𝘁:\n"Exploração sombria em estilo roguelike ASCII: desça masmorras, lute, morra, evolua e tente ir mais fundo a cada run."\n\nhttps://t.me/RogueQuest_bot`;
+    
     if (navigator.share) {
       try {
-        await navigator.share(shareData);
+        await navigator.share({
+          text: shareText,
+        });
       } catch (err) {
-        console.error('Erro ao compartilhar:', err);
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Erro ao compartilhar:', err);
+        }
       }
     } else {
-      window.open('https://t.me/RogueQuest_bot', '_blank');
+      try {
+        await navigator.clipboard.writeText(shareText);
+        alert("Mensagem de convite copiada para a área de transferência!");
+      } catch (e) {
+        window.open('https://t.me/RogueQuest_bot', '_blank');
+      }
     }
   };
 
