@@ -40,11 +40,11 @@ export function generateDungeon(level: number) {
   const potions: PotionEntity[] = [];
 
   // Chave
-  const keyRoom = rooms[Math.floor(Math.random() * (rooms.length - 1)) + 1];
+  const keyRoom = rooms[Math.floor(Math.random() * (rooms.length - 2)) + 1];
   const keyPos = { x: keyRoom.x + 1, y: keyRoom.y + 1 };
 
-  // Mercador (Mercante)
-  const merchantRoom = rooms[Math.floor(Math.random() * (rooms.length - 1)) + 1];
+  // Mercador
+  const merchantRoom = rooms[Math.floor(Math.random() * (rooms.length - 2)) + 1];
   const merchantPos = { x: merchantRoom.x + merchantRoom.w - 2, y: merchantRoom.y + 1 };
 
   // Inimigos
@@ -57,17 +57,13 @@ export function generateDungeon(level: number) {
     const ex = Math.floor(Math.random() * MAP_WIDTH);
     const ey = Math.floor(Math.random() * MAP_HEIGHT);
     
-    const isStairs = ex === stairsPos.x && ey === stairsPos.y;
-    const isKey = ex === keyPos.x && ey === keyPos.y;
-    const isPlayer = ex === playerPos.x && ey === playerPos.y;
-    const isMerchant = merchantPos && ex === merchantPos.x && ey === merchantPos.y;
+    // Condição estrita de não sobreposição
+    const isOverlappingVital = (ex === stairsPos.x && ey === stairsPos.y) ||
+                               (ex === keyPos.x && ey === keyPos.y) ||
+                               (ex === playerPos.x && ey === playerPos.y) ||
+                               (merchantPos && ex === merchantPos.x && ey === merchantPos.y);
     
-    if (map[ey][ex] === 'FLOOR' && 
-        !isPlayer && 
-        !isStairs && 
-        !isKey && 
-        !isMerchant &&
-        !enemies.some(e => e.x === ex && e.y === ey)) {
+    if (map[ey][ex] === 'FLOOR' && !isOverlappingVital && !enemies.some(e => e.x === ex && e.y === ey)) {
           const availableEnemies = ENEMY_TYPES.filter(e => e.minLevel <= level);
           const template = availableEnemies[Math.floor(Math.random() * availableEnemies.length)];
           enemies.push({
@@ -83,12 +79,20 @@ export function generateDungeon(level: number) {
   const numChests = Math.floor(Math.random() * 2) + 1;
   for(let c = 0; c < numChests; c++) {
     const room = rooms[Math.floor(Math.random() * (rooms.length - 1)) + 1];
-    chests.push({ id: `c-${level}-${c}-${Math.random()}`, x: room.x + Math.floor(room.w/2), y: room.y + Math.floor(room.h/2) });
+    const cx = room.x + Math.floor(room.w/2);
+    const cy = room.y + Math.floor(room.h/2);
+    if (!((cx === stairsPos.x && cy === stairsPos.y) || (cx === keyPos.x && cy === keyPos.y))) {
+        chests.push({ id: `c-${level}-${c}-${Math.random()}`, x: cx, y: cy });
+    }
   }
 
   rooms.forEach((room, idx) => {
     if (idx > 0 && idx % 5 === 0) {
-      potions.push({ id: `p-${level}-${idx}-${Math.random()}`, percent: 30, x: room.x + room.w - 1, y: room.y + room.h - 1 });
+      const px = room.x + room.w - 1;
+      const py = room.y + room.h - 1;
+      if (!((px === stairsPos.x && py === stairsPos.y) || (px === keyPos.x && py === keyPos.y))) {
+          potions.push({ id: `p-${level}-${idx}-${Math.random()}`, percent: 30, x: px, y: py });
+      }
     }
   });
 

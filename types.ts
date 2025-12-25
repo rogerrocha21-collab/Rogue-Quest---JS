@@ -3,6 +3,8 @@ export type TileType = 'WALL' | 'FLOOR' | 'PLAYER' | 'ENEMY' | 'CHEST' | 'STAIRS
 
 export type LevelTheme = 'FOREST' | 'DESERT' | 'SNOW' | 'CAVE' | 'MATRIX' | 'INFERNO' | 'VOID';
 
+export type Language = 'PT' | 'EN' | 'ES';
+
 export interface Position {
   x: number;
   y: number;
@@ -75,6 +77,7 @@ export interface GameState {
   tronTimeLeft?: number;
   tronTrail?: Position[];
   activePet?: Pet;
+  language?: Language;
 }
 
 export type StatChoice = 'Ataque' | 'Armadura' | 'Velocidade';
