@@ -183,6 +183,25 @@ export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: b
             <button disabled={gold < 12} onClick={() => onBuyPet('CORUJA')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Owl /><span className="text-[10px] font-bold text-white mt-1 uppercase">{t.pet_coruja}</span><span className="text-[9px] text-yellow-500">12G</span></button>
           </div>
         )}
+        
+        {/* Nova Opção: Cavalo */}
+        <button 
+          disabled={gold < 25} 
+          onClick={onRentTron} 
+          className="w-full flex items-center justify-between p-4 bg-zinc-800 rounded-xl border border-cyan-500/30 hover:border-cyan-400 transition-all disabled:opacity-50"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-cyan-500/10 rounded-lg text-cyan-400 animate-pulse">
+              <Icon.Horse />
+            </div>
+            <div className="text-left">
+              <p className="text-xs font-black text-white">{t.buy_horse}</p>
+              <p className="text-[9px] text-zinc-500 uppercase">15s • {t.pet_cavalo}</p>
+            </div>
+          </div>
+          <p className="text-xs font-bold text-yellow-500">25G</p>
+        </button>
+
         <div className="grid grid-cols-3 gap-2">
             {potions.map(p => (<button key={p.id} disabled={gold < p.price!} onClick={() => onBuyPotion(p)} className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 hover:border-pink-500 disabled:opacity-50 transition-colors"><div className="text-pink-500 mb-1 flex justify-center"><Icon.Potion /></div><div className="text-[9px] font-bold text-white text-center">+{p.percent}% {t.hp}</div><div className="text-[9px] text-yellow-500 font-bold text-center">{p.price}G</div></button>))}
         </div>

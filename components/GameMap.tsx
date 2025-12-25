@@ -53,7 +53,7 @@ const GameMap: React.FC<GameMapProps> = ({ map, theme, playerPos, enemies, chest
       >
         {isPlayer ? (
           <span className={`${tronModeActive ? 'text-cyan-400 animate-tron-pulse scale-150' : TILE_COLORS.PLAYER} drop-shadow-[0_0_15px_rgba(250,204,21,1)] animate-player-bounce z-20`}>
-            {tronModeActive ? <Icon.Boot /> : <Icon.Player />}
+            {tronModeActive ? <Icon.Horse /> : <Icon.Player />}
           </span>
         ) : isPet ? (
           <span className={`${TILE_COLORS.PET} animate-pet-wiggle z-10 scale-90`}>
@@ -73,7 +73,7 @@ const GameMap: React.FC<GameMapProps> = ({ map, theme, playerPos, enemies, chest
           <span className={`${TILE_COLORS.STAIRS} animate-pulse scale-110 z-10`}><Icon.Stairs /></span>
         ) : isTrail ? (
           <div className="w-full h-full bg-cyan-400/20 animate-pulse flex items-center justify-center">
-            <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee]" />
+            <div className="w-full h-full border border-cyan-400/30 shadow-[0_0_10px_#22d3ee]" />
           </div>
         ) : map[y][x] === 'WALL' ? (
           <span className={`${config.wall} font-bold opacity-60 text-lg`}>{config.wallChar}</span>

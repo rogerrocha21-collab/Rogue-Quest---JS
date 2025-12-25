@@ -58,6 +58,13 @@ export const Icon = {
       <path d="M12 10l-1 1h2l-1-1z" fill="currentColor"/>
     </svg>
   ),
+  Horse: () => (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 20l3-4h4l3 4" />
+      <path d="M17 14s2-2 2-5-3-5-3-5l-4 3-4-3s-3 2-3 5 2 5 2 5h10z" fill="currentColor" fillOpacity="0.2" />
+      <path d="M10 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM14 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" />
+    </svg>
+  ),
   Volume2: () => (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
   ),

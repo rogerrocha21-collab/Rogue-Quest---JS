@@ -90,7 +90,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     bought_pet: "Mascote comprado!",
     bought_potion: "Poção comprada!",
     bought_item: "Equipado!",
-    tron_active: "MOTO TRON ATIVADA!",
+    tron_active: "CAVALO FANTASMA ATIVADO!",
     language_br: "Português",
     language_us: "English",
     language_es: "Español",
@@ -112,7 +112,9 @@ export const TRANSLATIONS: Record<Language, any> = {
     combat_pet: "Mascote",
     pet_lobo: "LOBO",
     pet_puma: "PUMA",
-    pet_coruja: "CORUJA"
+    pet_coruja: "CORUJA",
+    pet_cavalo: "CAVALO",
+    buy_horse: "ALUGAR CAVALO"
   },
   EN: {
     hero_placeholder: "HERO NAME",
@@ -142,7 +144,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     bought_pet: "Pet bought!",
     bought_potion: "Potion bought!",
     bought_item: "Equipped!",
-    tron_active: "TRON BIKE ACTIVATED!",
+    tron_active: "GHOST HORSE ACTIVATED!",
     language_br: "Portuguese",
     language_us: "English",
     language_es: "Spanish",
@@ -164,7 +166,9 @@ export const TRANSLATIONS: Record<Language, any> = {
     combat_pet: "Pet",
     pet_lobo: "WOLF",
     pet_puma: "PUMA",
-    pet_coruja: "OWL"
+    pet_coruja: "OWL",
+    pet_cavalo: "HORSE",
+    buy_horse: "RENT HORSE"
   },
   ES: {
     hero_placeholder: "NOMBRE DEL HÉROE",
@@ -194,7 +198,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     bought_pet: "¡Mascota comprada!",
     bought_potion: "¡Poción comprada!",
     bought_item: "¡Equipado!",
-    tron_active: "¡MOTO TRON ACTIVADA!",
+    tron_active: "¡CABALLO FANTASMA ACTIVADO!",
     language_br: "Portugués",
     language_us: "Inglés",
     language_es: "Español",
@@ -216,6 +220,8 @@ export const TRANSLATIONS: Record<Language, any> = {
     combat_pet: "Mascota",
     pet_lobo: "LOBO",
     pet_puma: "PUMA",
-    pet_coruja: "BÚHO"
+    pet_coruja: "BÚHO",
+    pet_cavalo: "CABALLO",
+    buy_horse: "ALQUILAR CABALLO"
   }
 };

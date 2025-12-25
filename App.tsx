@@ -40,6 +40,23 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Timer do Cavalo (Tron Mode)
+  useEffect(() => {
+    if (gameState?.tronModeActive) {
+      const timer = setInterval(() => {
+        setGameState(prev => {
+          if (!prev || !prev.tronModeActive) return prev;
+          const newTimeLeft = (prev.tronTimeLeft || 0) - 1;
+          if (newTimeLeft <= 0) {
+            return { ...prev, tronModeActive: false, tronTimeLeft: 0, tronTrail: [] };
+          }
+          return { ...prev, tronTimeLeft: newTimeLeft };
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [gameState?.tronModeActive]);
+
   const saveGame = (state: GameState) => {
     localStorage.setItem('rq_save_mobile_v2', JSON.stringify({ ...state, language: currentLang }));
   };
@@ -175,11 +192,22 @@ const App: React.FC = () => {
     const { playerPos, map, enemies, potions, keyPos, merchantPos, hasKey, stairsPos, enemiesKilledInLevel, chests, tronModeActive, tronTrail = [], activePet } = gameState;
     const nx = playerPos.x + dx; const ny = playerPos.y + dy;
     if (nx < 0 || nx >= MAP_WIDTH || ny < 0 || ny >= MAP_HEIGHT || map[ny][nx] === 'WALL') return;
+    
     const enemy = enemies.find(e => e.x === nx && e.y === ny);
     if (enemy) { 
         if (tronModeActive) {
-            const goldGain = Math.floor(Math.random() * 5) + 5; playCoinSound();
-            setGameState({ ...gameState, gold: gameState.gold + goldGain, enemies: enemies.filter(e => e.id !== enemy.id), enemiesKilledInLevel: enemiesKilledInLevel + 1, playerPos: { x: nx, y: ny }, tronTrail: [...tronTrail, playerPos], activePet: activePet ? { ...activePet, pos: playerPos } : undefined });
+            // Atropelar inimigo
+            const goldGain = Math.floor(Math.random() * 8) + 12; playCoinSound();
+            setGameState({ 
+              ...gameState, 
+              gold: gameState.gold + goldGain, 
+              enemies: enemies.filter(e => e.id !== enemy.id), 
+              enemiesKilledInLevel: enemiesKilledInLevel + 1, 
+              playerPos: { x: nx, y: ny }, 
+              tronTrail: [...tronTrail, playerPos], 
+              activePet: activePet ? { ...activePet, pos: playerPos } : undefined,
+              logs: [...gameState.logs, `Trampled! +${goldGain}G`]
+            });
             return;
         } else { setGameState({ ...gameState, gameStatus: 'COMBAT', currentEnemy: enemy }); return; }
     }
@@ -297,6 +325,17 @@ const App: React.FC = () => {
         />
         <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} />
         
+        {/* Timer UI do Cavalo */}
+        {gameState.tronModeActive && (
+          <div className="w-full bg-cyan-900/20 border border-cyan-500/50 p-2 rounded-lg flex justify-between items-center animate-pulse">
+            <div className="flex items-center gap-2 text-cyan-400">
+              <Icon.Horse />
+              <span className="text-[10px] font-black uppercase tracking-widest">{t.tron_active}</span>
+            </div>
+            <span className="text-xs font-black text-cyan-400">{gameState.tronTimeLeft}s</span>
+          </div>
+        )}
+
         {gameState.gameStatus === 'LOST' && (
           <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center p-8 z-[100] animate-in fade-in duration-1000">
             <div className="absolute inset-0 bg-red-900/10 animate-glitch pointer-events-none" />
@@ -362,7 +401,18 @@ const App: React.FC = () => {
            if (item.stat === 'maxHp') { s.maxHp += item.value; s.hp += item.value; } else { (s as any)[item.stat] += item.value; }
            const nextState: GameState = { ...gameState, gold: gameState.gold - (item.price || 0), playerStats: s, logs: [...gameState.logs, t.bought_item] };
            setGameState(nextState); saveGame(nextState);
-        }} onRentTron={() => {}} />
+        }} onRentTron={() => {
+           playChime();
+           setGameState({ 
+             ...gameState, 
+             gold: gameState.gold - 25, 
+             tronModeActive: true, 
+             tronTimeLeft: 15, 
+             tronTrail: [], 
+             gameStatus: 'PLAYING',
+             logs: [...gameState.logs, t.tron_active]
+           });
+        }} />
       )}
     </div>
   );
