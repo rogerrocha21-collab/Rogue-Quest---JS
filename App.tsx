@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [currentLang, setCurrentLang] = useState<Language>('PT');
   const [moveQueue, setMoveQueue] = useState<Position[]>([]);
   const [isNewGameMode, setIsNewGameMode] = useState(false);
+  const [inventoryFullAlert, setInventoryFullAlert] = useState(false);
   
   const audioContext = useRef<AudioContext | null>(null);
   const currentSongIdx = useRef<number>(0);
@@ -181,7 +182,7 @@ const App: React.FC = () => {
           playChime();
           setMoveQueue(q => q.slice(1));
           playerPosRef.current = nextPos;
-          return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos, activePet: updatedPet } as GameState;
+          return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos, activePet: updatedPet, keyPath: undefined } as GameState;
         }
 
         const potion = prev.potions.find(p => p.x === nextPos.x && p.y === nextPos.y);
@@ -214,10 +215,16 @@ const App: React.FC = () => {
           }
         }
 
-        // Simplesmente move
+        // Recalcular pegadas brilhantes se o efeito Olhos Abertos estiver ativo
+        let newKeyPath = prev.keyPath;
+        if (prev.activeAltarEffect?.id === 'open_eyes' && !prev.hasKey && prev.keyPos) {
+           const path = findDungeonPath(nextPos, prev.keyPos, prev.map, prev.enemies);
+           if (path) newKeyPath = path;
+        }
+
         setMoveQueue(q => q.slice(1));
         playerPosRef.current = nextPos;
-        return { ...prev, playerPos: nextPos, activePet: updatedPet, keyPath: prev.keyPath ? prev.keyPath.slice(1) : undefined } as GameState;
+        return { ...prev, playerPos: nextPos, activePet: updatedPet, keyPath: newKeyPath } as GameState;
       });
     };
 
@@ -227,10 +234,13 @@ const App: React.FC = () => {
 
   const handleTileClick = (tx: number, ty: number) => {
     if (!gameState || gameState.gameStatus !== 'PLAYING') return;
+    
+    // O findDungeonPath original ignora inimigos apenas para visual, mas aqui precisamos considerar obstáculos
+    // Modifiquei findDungeonPath no dungeon.ts para sempre ignorar inimigos no cálculo do caminho para não "travar"
+    // Mas o loop de movimento acima interrompe se encontrar um inimigo no caminho.
     const path = findDungeonPath(playerPosRef.current, { x: tx, y: ty }, gameState.map, gameState.enemies);
     if (path && path.length > 0) {
       setMoveQueue(path);
-      setGameState(prev => prev ? { ...prev, keyPath: path } : null);
     } else {
       setMoveQueue([]);
     }
@@ -408,6 +418,10 @@ const App: React.FC = () => {
              } else {
                setGameState(prev => {
                  if(!prev) return prev;
+                 if (prev.inventory.length >= prev.inventorySize) {
+                   setInventoryFullAlert(true);
+                   return prev;
+                 }
                  return { ...prev, gold: prev.gold - pot.price!, inventory: [...prev.inventory, pot] } as GameState;
                });
              }
@@ -468,7 +482,6 @@ const App: React.FC = () => {
         </div>
       )}
       
-      {/* TELA DE MORTE ATUALIZADA COM ESTATÍSTICAS FINAIS */}
       {gameState.gameStatus === 'LOST' && (
         <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-6 space-y-6 animate-in fade-in overflow-y-auto">
           <div className="text-center space-y-2">
@@ -538,7 +551,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* TELA DE PRÓXIMO NÍVEL */}
       {gameState.gameStatus === 'NEXT_LEVEL' && (
         <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in">
           <div className="text-center space-y-4">
@@ -571,10 +583,22 @@ const App: React.FC = () => {
             if (gameState.inventory.length < gameState.inventorySize) {
               setGameState({...gameState, inventory: [...gameState.inventory, gameState.currentPotion!], gameStatus: 'PLAYING' as const, currentPotion: undefined});
             } else {
+              setInventoryFullAlert(true);
               setGameState({...gameState, gameStatus: 'PLAYING' as const, currentPotion: undefined, logs: [...gameState.logs, t.inventory_full]});
             }
           }
         }} />
+      )}
+
+      {inventoryFullAlert && (
+        <div className="fixed inset-0 z-[150] bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm">
+          <div className="bg-zinc-900 border-2 border-red-500 p-8 rounded-3xl max-w-xs w-full text-center space-y-4 animate-in zoom-in-95">
+             <div className="text-red-500 flex justify-center scale-150 mb-2"><Icon.Backpack /></div>
+             <h3 className="text-white font-black uppercase text-sm">Inventário Cheio!</h3>
+             <p className="text-zinc-500 text-xs">{t.inventory_full}</p>
+             <button onClick={() => setInventoryFullAlert(false)} className="w-full py-3 bg-red-600 text-white font-black rounded-xl uppercase text-xs">OK</button>
+          </div>
+        </div>
       )}
     </div>
   );
