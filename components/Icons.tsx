@@ -127,5 +127,14 @@ export const Icon = {
   ),
   Users: () => (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  ),
+  FlagBR: () => (
+    <svg viewBox="0 0 32 24" width="24" height="18"><rect width="32" height="24" fill="#009c3b"/><path d="M16 3l13 9-13 9L3 12z" fill="#ffdf00"/><circle cx="16" cy="12" r="5" fill="#002776"/></svg>
+  ),
+  FlagUS: () => (
+    <svg viewBox="0 0 32 24" width="24" height="18"><rect width="32" height="24" fill="#b22234"/><path d="M0 0h14v13H0z" fill="#3c3b6e"/><path d="M0 2h32M0 5.3h32M0 8.6h32M0 12h32M0 15.3h32M0 18.6h32M0 22h32" stroke="#fff" strokeWidth="1.6"/><path d="M0 0h14v13H0z" fill="#3c3b6e"/></svg>
+  ),
+  FlagES: () => (
+    <svg viewBox="0 0 32 24" width="24" height="18"><rect width="32" height="24" fill="#aa151b"/><rect y="6" width="32" height="12" fill="#ffc400"/><rect y="18" width="32" height="6" fill="#aa151b"/></svg>
   )
 };

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { TileType, Position, Enemy, Chest, PotionEntity, ItemEntity, LevelTheme, Pet } from '../types';
 import { TILE_COLORS, MAP_WIDTH, MAP_HEIGHT, THEME_CONFIG } from '../constants';
@@ -28,6 +27,8 @@ const VIEW_H = 13;
 const GameMap: React.FC<GameMapProps> = ({ map, theme, playerPos, enemies, chests, potions, items, keyPos, merchantPos, hasKey, stairsPos, tronModeActive, tronTrail = [], activePet, onTileClick }) => {
   const config = THEME_CONFIG[theme] || THEME_CONFIG.VOID;
 
+  if (!map || map.length === 0) return null;
+
   let startX = Math.max(0, playerPos.x - Math.floor(VIEW_W / 2));
   let startY = Math.max(0, playerPos.y - Math.floor(VIEW_H / 2));
 
@@ -35,6 +36,9 @@ const GameMap: React.FC<GameMapProps> = ({ map, theme, playerPos, enemies, chest
   if (startY + VIEW_H > MAP_HEIGHT) startY = MAP_HEIGHT - VIEW_H;
 
   const renderTile = (y: number, x: number) => {
+    // Safety check for array indices
+    if (!map[y] || map[y][x] === undefined) return null;
+
     const isPlayer = x === playerPos.x && y === playerPos.y;
     const isPet = activePet && x === activePet.pos.x && y === activePet.pos.y && !isPlayer;
     const enemy = enemies.find(e => e.x === x && e.y === y);
@@ -88,7 +92,8 @@ const GameMap: React.FC<GameMapProps> = ({ map, theme, playerPos, enemies, chest
   for (let y = startY; y < startY + VIEW_H; y++) {
     const tiles = [];
     for (let x = startX; x < startX + VIEW_W; x++) {
-      tiles.push(renderTile(y, x));
+      const tile = renderTile(y, x);
+      if (tile) tiles.push(tile);
     }
     rows.push(<div key={y} className="flex">{tiles}</div>);
   }
