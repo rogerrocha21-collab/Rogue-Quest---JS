@@ -106,7 +106,7 @@ const App: React.FC = () => {
 
   const initLevel = useCallback((level: number, stats?: EntityStats, gold?: number, name?: string, activePet?: Pet, activeRelic?: Relic, inventory?: PotionEntity[]) => {
     if (level > MAX_LEVELS) {
-      setGameState(prev => prev ? { ...prev, gameStatus: 'WON' } : null);
+      setGameState(prev => prev ? { ...prev, gameStatus: 'WON' as const } : null);
       return;
     }
 
@@ -129,7 +129,7 @@ const App: React.FC = () => {
       items: [],
       hasKey: false,
       enemiesKilledInLevel: 0,
-      gameStatus: (level === 1 && !stats) ? 'TUTORIAL' : 'PLAYING',
+      gameStatus: (level === 1 && !stats) ? 'TUTORIAL' as const : 'PLAYING' as const,
       logs: (level === 1 && !stats) ? [`${finalPlayerName} entrou no abismo.`] : [`Descendo para o nível ${level}`],
       inventory: startInv,
       inventorySize: invSize,
@@ -160,19 +160,19 @@ const App: React.FC = () => {
       const enemy = prev.enemies.find(e => e.x === nx && e.y === ny);
       if (enemy) {
         setMoveQueue([]);
-        return { ...prev, gameStatus: 'COMBAT', currentEnemy: enemy };
+        return { ...prev, gameStatus: 'COMBAT' as const, currentEnemy: enemy };
       }
 
       const chest = prev.chests.find(c => c.x === nx && c.y === ny);
       if (chest) {
         setMoveQueue([]);
-        return { ...prev, gameStatus: 'CHEST_OPEN', chests: prev.chests.filter(c => c.id !== chest.id) };
+        return { ...prev, gameStatus: 'CHEST_OPEN' as const, chests: prev.chests.filter(c => c.id !== chest.id) };
       }
 
       const potion = prev.potions.find(p => p.x === nx && p.y === ny);
       if (potion) {
         setMoveQueue([]);
-        return { ...prev, gameStatus: 'PICKUP_CHOICE', currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) };
+        return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) };
       }
 
       if (prev.keyPos && nx === prev.keyPos.x && ny === prev.keyPos.y && !prev.hasKey) {
@@ -182,19 +182,19 @@ const App: React.FC = () => {
 
       if (prev.merchantPos && nx === prev.merchantPos.x && ny === prev.merchantPos.y) {
         setMoveQueue([]);
-        return { ...prev, gameStatus: 'MERCHANT_SHOP', playerPos: { x: nx, y: ny } };
+        return { ...prev, gameStatus: 'MERCHANT_SHOP' as const, playerPos: { x: nx, y: ny } };
       }
 
       if (prev.altarPos && nx === prev.altarPos.x && ny === prev.altarPos.y) {
         setMoveQueue([]);
-        return { ...prev, gameStatus: 'ALTAR_INTERACTION', playerPos: { x: nx, y: ny } };
+        return { ...prev, gameStatus: 'ALTAR_INTERACTION' as const, playerPos: { x: nx, y: ny } };
       }
 
       if (nx === prev.stairsPos.x && ny === prev.stairsPos.y) {
         setMoveQueue([]);
         if (prev.hasKey && prev.enemiesKilledInLevel > 0) {
           playChime();
-          return { ...prev, gameStatus: 'NEXT_LEVEL' };
+          return { ...prev, gameStatus: 'NEXT_LEVEL' as const };
         } else {
           return { ...prev, logs: [...prev.logs, t.log_locked], playerPos: { x: nx, y: ny } };
         }
@@ -252,7 +252,7 @@ const App: React.FC = () => {
   const onCombatFinish = (newStats: EntityStats, win: boolean, goldEarned: number, petHp?: number) => {
     setGameState(prev => {
       if (!prev) return prev;
-      if (!win) return { ...prev, gameStatus: 'LOST', lastStats: prev.playerStats };
+      if (!win) return { ...prev, gameStatus: 'LOST' as const, lastStats: prev.playerStats };
       
       const updatedPet = prev.activePet ? { ...prev.activePet, hp: petHp || 0 } : undefined;
       let finalGoldEarned = goldEarned;
@@ -263,11 +263,15 @@ const App: React.FC = () => {
       if (prev.activeAltarEffect?.id === 'surrendered_blood') nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.3));
 
       playCoinSound();
-      const updated = {
-        ...prev, playerStats: nextStats, gold: finalGoldTotal, gameStatus: 'PLAYING',
+      const updated: GameState = {
+        ...prev, 
+        playerStats: nextStats, 
+        gold: finalGoldTotal, 
+        gameStatus: 'PLAYING' as const,
         enemies: prev.enemies.filter(e => e.id !== prev.currentEnemy?.id),
         enemiesKilledInLevel: prev.enemiesKilledInLevel + 1,
-        activePet: updatedPet, currentEnemy: undefined
+        activePet: updatedPet, 
+        currentEnemy: undefined
       };
       saveGame(updated);
       return updated;
@@ -315,7 +319,7 @@ const App: React.FC = () => {
                       <p className="text-sm font-black text-white">{gameState.playerName}</p>
                       <p className="text-[10px] font-bold text-red-800 uppercase">Profundidade: {gameState.level}</p>
                     </div>
-                    <button onClick={() => { startMusic(); setGameState({ ...gameState, gameStatus: 'PLAYING' }); }} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95">{t.continue_journey}</button>
+                    <button onClick={() => { startMusic(); setGameState({ ...gameState, gameStatus: 'PLAYING' as const }); }} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95">{t.continue_journey}</button>
                     <button onClick={() => setIsNewGameMode(true)} className="w-full bg-[#1e1e1e] hover:bg-[#2a2a2a] py-5 rounded-2xl text-zinc-500 font-mono font-bold text-[10px] uppercase tracking-widest transition-all">{t.new_game}</button>
                   </div>
                 ) : (
@@ -379,7 +383,7 @@ const App: React.FC = () => {
             if (choice === 'Ataque') stats.attack += 5 * multiplier;
             if (choice === 'Armadura') { stats.maxArmor += 3 * multiplier; stats.armor += 3 * multiplier; }
             if (choice === 'Velocidade') stats.speed += 4 * multiplier;
-            return { ...prev, playerStats: stats, gameStatus: 'PLAYING', activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect };
+            return { ...prev, playerStats: stats, gameStatus: 'PLAYING' as const, activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect };
           });
       }} language={currentLang} doubleBonus={gameState.activeAltarEffect?.id === 'consecrated_chest'} />}
       
@@ -394,13 +398,13 @@ const App: React.FC = () => {
                 const effect = pool[Math.floor(Math.random() * pool.length)];
                 let playerStats = { ...prev.playerStats };
                 if (effect.id === 'anxious_strike') playerStats.attack = Math.floor(playerStats.attack * 2); 
-                return { ...prev, gameStatus: 'ALTAR_RESULT', activeAltarEffect: effect, hasUsedAltarInLevel: true, playerStats };
+                return { ...prev, gameStatus: 'ALTAR_RESULT' as const, activeAltarEffect: effect, hasUsedAltarInLevel: true, playerStats };
               });
-          }} onClose={() => setGameState({ ...gameState, gameStatus: 'PLAYING' })} 
+          }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } : null)} 
         />
       )}
       {gameState.gameStatus === 'ALTAR_RESULT' && gameState.activeAltarEffect && (
-        <AltarResultModal effect={gameState.activeAltarEffect} language={currentLang} onClose={() => setGameState({ ...gameState, gameStatus: 'PLAYING' })} />
+        <AltarResultModal effect={gameState.activeAltarEffect} language={currentLang} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } : null)} />
       )}
       
       {gameState.gameStatus === 'WON' && (
