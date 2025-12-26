@@ -479,7 +479,10 @@ const App: React.FC = () => {
               </p>
             </div>
             <div className="flex gap-2">
-              <button className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+              <button 
+                onClick={() => window.open('https://t.me/+rzUhHnyeeSM1MDNh', '_blank')}
+                className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+              >
                 <Icon.Users />
               </button>
               <button onClick={handleShare} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
