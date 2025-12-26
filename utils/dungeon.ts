@@ -42,20 +42,19 @@ export function generateDungeon(level: number) {
     }
   }
 
-  // Converter labirinto booleano para o mapa do jogo e criar "atalhos" para não ser um labirinto perfeito frustrante
+  // Converter labirinto booleano para o mapa do jogo e criar "atalhos"
   for (let y = 0; y < currentHeight; y++) {
     for (let x = 0; x < currentWidth; x++) {
       if (maze[y][x]) {
         map[y][x] = 'FLOOR';
       } else if (x > 0 && x < currentWidth - 1 && y > 0 && y < currentHeight - 1) {
-        // Abrir paredes aleatoriamente para criar ciclos e facilitar navegação
         if (Math.random() < 0.08) map[y][x] = 'FLOOR';
       }
     }
   }
 
-  const biomeIdx = Math.floor((level - 1) / 12) % BIOME_ORDER.length;
-  const theme = BIOME_ORDER[biomeIdx];
+  // Seleção aleatória de tema para cada nível
+  const theme = BIOME_ORDER[Math.floor(Math.random() * BIOME_ORDER.length)];
 
   const occupied = new Set<string>();
   const getFreeTile = () => {
@@ -96,7 +95,7 @@ export function generateDungeon(level: number) {
   }
 
   const potions: PotionEntity[] = [];
-  const numPotions = Math.floor(Math.random() * 2) + 2; // 2 a 3 poções
+  const numPotions = Math.floor(Math.random() * 2) + 2; 
   for (let i = 0; i < numPotions; i++) {
     const pos = getFreeTile();
     potions.push({
@@ -110,9 +109,6 @@ export function generateDungeon(level: number) {
   const altarPos = getFreeTile();
   let merchantPos = (level % 5 === 0 || level === 1) ? getFreeTile() : undefined;
 
-  // Verificação de Acessibilidade: Se o algoritmo de maze for perfeito, tudo é conectado.
-  // Como abrimos atalhos, a conectividade é mantida.
-  
   return { map, theme, playerPos, stairsPos, enemies, chests, potions, keyPos, merchantPos, altarPos };
 }
 
@@ -141,7 +137,6 @@ export function findDungeonPath(start: Position, end: Position, map: TileType[][
       const ny = pos.y + dy;
       const key = `${nx},${ny}`;
       if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT && map[ny][nx] === 'FLOOR' && !visited.has(key)) {
-        // Ignoramos inimigos para o cálculo de "Pegadas Brilhantes" e para permitir que o clique tente passar por eles
         visited.add(key);
         queue.push({ pos: { x: nx, y: ny }, path: [...path, { x: nx, y: ny }] });
       }
