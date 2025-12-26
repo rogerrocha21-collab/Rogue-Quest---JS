@@ -249,7 +249,8 @@ const App: React.FC = () => {
         setMoveQueue([]);
         if (prev.hasKey && prev.enemiesKilledInLevel > 0) {
           playChime();
-          return { ...prev, gameStatus: 'RELIC_SELECTION', relicOptions: RELICS_POOL.sort(() => 0.5 - Math.random()).slice(0, 3) };
+          // Mudança: Ao descer, não escolhe relíquia. Vai direto para o próximo andar.
+          return { ...prev, gameStatus: 'NEXT_LEVEL' };
         } else {
           return { ...prev, logs: [...prev.logs, TRANSLATIONS[currentLang].log_locked], playerPos: { x: nx, y: ny } };
         }
@@ -269,6 +270,21 @@ const App: React.FC = () => {
       return { ...prev, playerPos: newPos, tronTrail: newTrail, activePet: newPet };
     });
   }, [currentLang]);
+
+  // Efeito para tratar a descida imediata de nível sem modal de relíquia
+  useEffect(() => {
+    if (gameState?.gameStatus === 'NEXT_LEVEL') {
+      initLevel(
+        gameState.level + 1,
+        gameState.playerStats,
+        gameState.gold,
+        gameState.playerName,
+        gameState.activePet,
+        gameState.activeRelic,
+        gameState.inventory
+      );
+    }
+  }, [gameState?.gameStatus, gameState?.level, initLevel]);
 
   const handleTileClick = (tx: number, ty: number) => {
     if (!gameState || gameState.gameStatus !== 'PLAYING') return;
@@ -391,13 +407,8 @@ const App: React.FC = () => {
 
   const onRelicSelect = (relic: Relic) => {
     if (!gameState) return;
-    // Se estivermos no modo Renascer (vimos da tela LOST ou estamos tentando resetar pro nível 1)
-    const isRestarting = gameState.playerStats.hp <= 0;
-    if (isRestarting) {
-        initLevel(1, undefined, 0, gameState.playerName, undefined, relic, []);
-    } else {
-        initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, relic, gameState.inventory);
-    }
+    // No novo fluxo, a seleção de relíquia só ocorre no renascimento (LOST -> RELIC -> START)
+    initLevel(1, undefined, 0, gameState.playerName, undefined, relic, []);
   };
 
   if (!gameState) return <div className="bg-black min-h-screen" />;
@@ -472,7 +483,7 @@ const App: React.FC = () => {
       )}
 
       {/* Interface Principal do Jogo */}
-      {gameState.gameStatus !== 'START_SCREEN' && gameState.gameStatus !== 'WON' && gameState.map.length > 0 && (
+      {gameState.gameStatus !== 'START_SCREEN' && gameState.gameStatus !== 'WON' && gameState.gameStatus !== 'NEXT_LEVEL' && gameState.map.length > 0 && (
         <div className="max-w-[480px] mx-auto p-4 flex flex-col gap-4 min-h-screen">
           <header className="flex justify-between items-start py-4 px-1 border-b border-zinc-900 mb-2">
             <div className="flex flex-col">
