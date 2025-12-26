@@ -155,68 +155,57 @@ const App: React.FC = () => {
   useEffect(() => {
     if (moveQueue.length === 0 || !gameState || gameState.gameStatus !== 'PLAYING') return;
 
-    const timer = setTimeout(() => {
-      const nextPos = moveQueue[0];
-      
+    const moveStep = () => {
       setGameState(prev => {
         if (!prev || prev.gameStatus !== 'PLAYING' || moveQueue.length === 0) return prev;
 
-        const { x, y } = nextPos;
+        const nextPos = moveQueue[0];
         const oldPos = { ...prev.playerPos };
-        const dx = Math.abs(x - playerPosRef.current.x);
-        const dy = Math.abs(y - playerPosRef.current.y);
         
-        if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) {
-           setMoveQueue([]);
-           return prev;
-        }
-
-        if (prev.map[y][x] === 'WALL') {
-          setMoveQueue([]);
-          return prev;
-        }
-
+        // Remove a verificação de adjacência rigorosa para evitar travas de sync
+        // Confiamos no findDungeonPath que já gera passos adjacentes
+        
         const updatedPet = prev.activePet ? { ...prev.activePet, pos: oldPos } : undefined;
 
-        // PRIORIDADE DE INTERAÇÃO
-        const enemy = prev.enemies.find(e => e.x === x && e.y === y);
+        // PRIORIDADE DE INTERAÇÃO NO TILE DE DESTINO
+        const enemy = prev.enemies.find(e => e.x === nextPos.x && e.y === nextPos.y);
         if (enemy) {
           setMoveQueue([]);
           return { ...prev, gameStatus: 'COMBAT' as const, currentEnemy: enemy } as GameState;
         }
 
-        const chest = prev.chests.find(c => c.x === x && c.y === y);
+        const chest = prev.chests.find(c => c.x === nextPos.x && c.y === nextPos.y);
         if (chest) {
           setMoveQueue([]);
           return { ...prev, gameStatus: 'CHEST_OPEN' as const, chests: prev.chests.filter(c => c.id !== chest.id) } as GameState;
         }
 
-        if (prev.keyPos && x === prev.keyPos.x && y === prev.keyPos.y && !prev.hasKey) {
+        if (prev.keyPos && nextPos.x === prev.keyPos.x && nextPos.y === prev.keyPos.y && !prev.hasKey) {
           playChime();
           setMoveQueue(q => q.slice(1));
           playerPosRef.current = nextPos;
           return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos, activePet: updatedPet } as GameState;
         }
 
-        const potion = prev.potions.find(p => p.x === x && p.y === y);
+        const potion = prev.potions.find(p => p.x === nextPos.x && p.y === nextPos.y);
         if (potion) {
           setMoveQueue([]);
           return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) } as GameState;
         }
 
-        if (prev.merchantPos && x === prev.merchantPos.x && y === prev.merchantPos.y) {
+        if (prev.merchantPos && nextPos.x === prev.merchantPos.x && nextPos.y === prev.merchantPos.y) {
           setMoveQueue([]);
           playerPosRef.current = nextPos;
           return { ...prev, gameStatus: 'MERCHANT_SHOP' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
         }
 
-        if (prev.altarPos && x === prev.altarPos.x && y === prev.altarPos.y) {
+        if (prev.altarPos && nextPos.x === prev.altarPos.x && nextPos.y === prev.altarPos.y) {
           setMoveQueue([]);
           playerPosRef.current = nextPos;
           return { ...prev, gameStatus: 'ALTAR_INTERACTION' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
         }
 
-        if (x === prev.stairsPos.x && y === prev.stairsPos.y) {
+        if (nextPos.x === prev.stairsPos.x && nextPos.y === prev.stairsPos.y) {
           if (prev.hasKey && prev.enemiesKilledInLevel > 0) {
             playChime();
             setMoveQueue([]);
@@ -228,18 +217,23 @@ const App: React.FC = () => {
           }
         }
 
+        // Simplesmente move
         setMoveQueue(q => q.slice(1));
         playerPosRef.current = nextPos;
         return { ...prev, playerPos: nextPos, activePet: updatedPet, keyPath: prev.keyPath ? prev.keyPath.slice(1) : undefined } as GameState;
       });
-    }, 100);
+    };
 
+    const timer = setTimeout(moveStep, 80); // Velocidade de movimento levemente aumentada
     return () => clearTimeout(timer);
   }, [moveQueue, gameState?.gameStatus, t]);
 
   const handleTileClick = (tx: number, ty: number) => {
     if (!gameState || gameState.gameStatus !== 'PLAYING') return;
+    
+    // Calcula o caminho a partir da posição ATUAL real do jogador (ref)
     const path = findDungeonPath(playerPosRef.current, { x: tx, y: ty }, gameState.map, gameState.enemies);
+    
     if (path && path.length > 0) {
       setMoveQueue(path);
       setGameState(prev => prev ? { ...prev, keyPath: path } : null);
@@ -288,7 +282,7 @@ const App: React.FC = () => {
         const newInv = [...prev.inventory];
         newInv.splice(idx, 1);
         used = true;
-        return { ...prev, activeAltarEffect: undefined, inventory: newInv };
+        return { ...prev, activeAltarEffect: undefined, inventory: newInv } as GameState;
       }
       const pot = prev.inventory[idx];
       const stats = { ...prev.playerStats };
@@ -299,7 +293,12 @@ const App: React.FC = () => {
       const newInv = [...prev.inventory];
       if (prev.activeAltarEffect?.id !== 'accepted_offering') newInv.splice(idx, 1);
       used = true;
-      return { ...prev, playerStats: stats, inventory: newInv, activeAltarEffect: prev.activeAltarEffect?.id === 'accepted_offering' ? undefined : prev.activeAltarEffect };
+      return { 
+        ...prev, 
+        playerStats: stats, 
+        inventory: newInv, 
+        activeAltarEffect: prev.activeAltarEffect?.id === 'accepted_offering' ? undefined : prev.activeAltarEffect 
+      } as GameState;
     });
     return used;
   };
@@ -367,6 +366,7 @@ const App: React.FC = () => {
             ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'} keyPath={gameState.keyPath} onTileClick={handleTileClick}
           />
 
+          {/* Fix: use gameState.playerName instead of non-existent playerName variable */}
           <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory}/>
         </div>
       )}
@@ -473,6 +473,41 @@ const App: React.FC = () => {
           <div className="text-center space-y-2"><h2 className="text-6xl font-black text-green-500 tracking-tighter uppercase">VITÓRIA</h2><p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">VOCÊ CONQUISTOU O ABISMO</p></div>
           <button onClick={() => { localStorage.removeItem('rq_save_v150_final'); window.location.reload(); }} className="w-full py-5 bg-green-600 text-white font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-green-500 transition-all">REINICIAR LENDA</button>
         </div>
+      )}
+      
+      {gameState.gameStatus === 'LOST' && (
+        <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in">
+          <div className="text-center space-y-2"><h2 className="text-6xl font-black text-red-600 tracking-tighter uppercase">{t.death_title}</h2><p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">{t.death_desc}</p></div>
+          <button onClick={() => { localStorage.removeItem('rq_save_v150_final'); window.location.reload(); }} className="w-full py-5 bg-red-800 text-white font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-red-700 transition-all">{t.rebirth}</button>
+        </div>
+      )}
+
+      {gameState.gameStatus === 'NEXT_LEVEL' && (
+        <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in">
+          <div className="text-center space-y-2"><h2 className="text-5xl font-black text-white tracking-tighter uppercase">{t.victory}</h2><p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">{t.descending} {gameState.level + 1}</p></div>
+          <button onClick={() => initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, gameState.activeRelic, gameState.inventory)} className="w-full py-5 bg-zinc-100 text-black font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-white transition-all">{t.next}</button>
+        </div>
+      )}
+
+      {gameState.gameStatus === 'TUTORIAL' && <TutorialModal onFinish={() => setGameState({...gameState, gameStatus: 'PLAYING' as const})} language={currentLang} />}
+      
+      {gameState.gameStatus === 'PICKUP_CHOICE' && gameState.currentPotion && (
+        <PotionPickupModal potion={gameState.currentPotion} language={currentLang} onChoice={(choice) => {
+          if (choice === 'use') {
+            const stats = { ...gameState.playerStats };
+            let boost = gameState.currentPotion!.percent;
+            if (gameState.activeAltarEffect?.id === 'profane_thirst') boost -= 10;
+            const heal = Math.floor(stats.maxHp * (boost / 100));
+            stats.hp = Math.min(stats.maxHp, stats.hp + heal);
+            setGameState({...gameState, playerStats: stats, gameStatus: 'PLAYING' as const, currentPotion: undefined});
+          } else {
+            if (gameState.inventory.length < gameState.inventorySize) {
+              setGameState({...gameState, inventory: [...gameState.inventory, gameState.currentPotion!], gameStatus: 'PLAYING' as const, currentPotion: undefined});
+            } else {
+              setGameState({...gameState, gameStatus: 'PLAYING' as const, currentPotion: undefined, logs: [...gameState.logs, t.inventory_full]});
+            }
+          }
+        }} />
       )}
     </div>
   );
