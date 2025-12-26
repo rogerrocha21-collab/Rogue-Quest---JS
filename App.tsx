@@ -391,7 +391,13 @@ const App: React.FC = () => {
 
   const onRelicSelect = (relic: Relic) => {
     if (!gameState) return;
-    initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, relic, gameState.inventory);
+    // Se estivermos no modo Renascer (vimos da tela LOST ou estamos tentando resetar pro nível 1)
+    const isRestarting = gameState.playerStats.hp <= 0;
+    if (isRestarting) {
+        initLevel(1, undefined, 0, gameState.playerName, undefined, relic, []);
+    } else {
+        initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, relic, gameState.inventory);
+    }
   };
 
   if (!gameState) return <div className="bg-black min-h-screen" />;
@@ -623,7 +629,16 @@ const App: React.FC = () => {
             )}
           </div>
           <button 
-            onClick={() => { localStorage.removeItem('rq_save_mobile_v2'); window.location.reload(); }}
+            onClick={() => {
+                setGameState(prev => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        gameStatus: 'RELIC_SELECTION',
+                        relicOptions: RELICS_POOL.sort(() => 0.5 - Math.random()).slice(0, 3)
+                    };
+                });
+            }}
             className="w-full max-w-xs py-5 bg-zinc-100 text-black font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-white transition-all transform active:scale-95"
           >
             {t.rebirth}
