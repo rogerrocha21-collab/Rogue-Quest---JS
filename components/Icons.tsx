@@ -64,6 +64,12 @@ export const Icon = {
       <circle cx="10" cy="8" r="1" fill="currentColor"/>
     </svg>
   ),
+  Corvo: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" width={props.width || "20"} height={props.height || "20"} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2C8 2 6 5 6 9v3c0 3 2 5 6 5s6-2 6-5V9c0-4-2-7-6-7z" fill="currentColor" fillOpacity="0.2"/>
+      <path d="M6 12l-3 1M18 12l3 1M10 17l2 2 2-2" stroke="currentColor" />
+    </svg>
+  ),
   Owl: (props: IconProps) => (
     <svg viewBox="0 0 24 24" width={props.width || "20"} height={props.height || "20"} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2C9 2 7 4 7 7v4c0 4 3 7 5 7s5-3 5-7V7c0-3-2-5-5-5z" fill="currentColor" fillOpacity="0.2"/>

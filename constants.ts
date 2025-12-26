@@ -1,9 +1,9 @@
 
 import { LevelTheme, Language, Relic, AltarEffect } from './types';
 
-export const MAP_WIDTH = 100; // Máximo para níveis letais
-export const MAP_HEIGHT = 60; // Máximo para níveis letais
-export const MAX_LEVELS = 150;
+export const MAP_WIDTH = 100;
+export const MAP_HEIGHT = 60;
+export const MAX_LEVELS = 15;
 
 export const INITIAL_PLAYER_STATS = {
   hp: 120,
@@ -96,12 +96,12 @@ export const TILE_COLORS: Record<string, string> = {
 export const ENEMY_TYPES = [
   { name: 'Rastejante', minLevel: 1 },
   { name: 'Vigia Escuro', minLevel: 1 },
-  { name: 'Guerreiro Caído', minLevel: 10 },
-  { name: 'Espectro', minLevel: 25 },
-  { name: 'Bruto de Elite', minLevel: 50 },
-  { name: 'Assassino das Sombras', minLevel: 80 },
-  { name: 'Colosso Arcano', minLevel: 110 },
-  { name: 'Soberano do Abismo', minLevel: 140 },
+  { name: 'Guerreiro Caído', minLevel: 3 },
+  { name: 'Espectro', minLevel: 5 },
+  { name: 'Bruto de Elite', minLevel: 7 },
+  { name: 'Assassino das Sombras', minLevel: 10 },
+  { name: 'Colosso Arcano', minLevel: 12 },
+  { name: 'Soberano do Abismo', minLevel: 14 },
 ];
 
 export const ITEM_POOL = [
@@ -182,8 +182,8 @@ export const TRANSLATIONS: Record<Language, any> = {
     combat_pet: "Mascote",
     pet_lobo: "LOBO",
     pet_puma: "PUMA",
-    pet_coruja: "CORUJA",
-    pet_cavalo: "CAVALO",
+    pet_corvo: "CORVO",
+    pet_cavalo: "CABALLO",
     buy_horse: "ALUGAR CAVALO",
     descending: "Descendo para o nível",
     log_entry: "entrou no abismo.",
@@ -304,7 +304,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     combat_pet: "Pet",
     pet_lobo: "WOLF",
     pet_puma: "PUMA",
-    pet_coruja: "OWL",
+    pet_corvo: "CROW",
     pet_cavalo: "HORSE",
     buy_horse: "RENT HORSE",
     descending: "Descending to level",
@@ -369,7 +369,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     relic_active: "RELIQUIA ACTIVA",
     hero_placeholder: "NOMBRE DEL HÉROE",
     continue_journey: "Continuar Jornada",
-    new_game: "Nuevo Jogo",
+    new_game: "Novo Jogo",
     start_journey: "Iniciar Jornada",
     feedback: "Feedback",
     abyss: "El Abismo Infinito",
@@ -426,7 +426,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     combat_pet: "Mascote",
     pet_lobo: "LOBO",
     pet_puma: "PUMA",
-    pet_coruja: "BÚHO",
+    pet_corvo: "CUERVO",
     pet_cavalo: "CABALLO",
     buy_horse: "ALQUILAR CABALLO",
     descending: "Descendiendo al nivel",
@@ -444,7 +444,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     b_strike_name: "Golpe Ansioso",
     b_strike_desc: "El primer ataque después de orar causa daño doble.",
     b_fists_name: "Puños Consagrados",
-    b_fists_desc: "Tus ataques ignoran parte de la defensa enemiga.",
+    b_fists_desc: "Tus ataques ignoram parte de la defensa enemiga.",
     b_eyes_name: "Ojos Abiertos",
     b_eyes_desc: "La ubicación de la llave ha sido revelada.",
     b_luck_name: "Suerte Peregrina",

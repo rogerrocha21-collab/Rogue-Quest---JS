@@ -26,6 +26,23 @@ const App: React.FC = () => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
 
+  // Lógica do Timer do Cavalo Fantasma
+  useEffect(() => {
+    if (!gameState || !gameState.tronModeActive) return;
+
+    const timer = setInterval(() => {
+      setGameState(prev => {
+        if (!prev || prev.tronTimeLeft === undefined) return prev;
+        if (prev.tronTimeLeft <= 1) {
+          return { ...prev, tronModeActive: false, tronTimeLeft: 0, tronTrail: [] };
+        }
+        return { ...prev, tronTimeLeft: prev.tronTimeLeft - 1 };
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [gameState?.tronModeActive]);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('rq_save_v150_final');
@@ -62,19 +79,11 @@ const App: React.FC = () => {
 
   const t = TRANSLATIONS[currentLang];
 
-  const handleShare = async () => {
-    const shareText = `𝗥𝗼𝗴𝘂𝗲 𝗤𝘂𝗲𝘀𝘁:\n"Desci até o nível ${gameState?.level || 1} no Abismo Eterno! Consegue chegar mais longe?"\n\nhttps://t.me/RogueQuest_bot`;
-    if (navigator.share) {
-      try { await navigator.share({ text: shareText }); } catch (err) {}
-    } else {
-      try { await navigator.clipboard.writeText(shareText); alert("Link de convite copiado!"); } catch (e) { }
-    }
-  };
-
   const playSound = (freq: number, type: OscillatorType = 'sine', duration: number = 0.1, gainVal: number = 0.05) => {
     if (isMutedRef.current || !audioContext.current) return;
     try {
       const ctx = audioContext.current;
+      if (ctx.state === 'suspended') ctx.resume();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type;
@@ -91,8 +100,8 @@ const App: React.FC = () => {
   const playChime = () => playSound(880, 'sine', 0.3);
   const playCoinSound = () => playSound(987, 'sine', 0.1, 0.03);
   const playAttackSound = (attacker: 'player' | 'enemy') => {
-    if (attacker === 'player') playSound(600, 'square', 0.2, 0.02);
-    else playSound(200, 'sawtooth', 0.2, 0.04);
+    if (attacker === 'player') playSound(600, 'square', 0.15, 0.04);
+    else playSound(220, 'sawtooth', 0.2, 0.06);
   };
 
   const startMusic = () => {
@@ -104,10 +113,10 @@ const App: React.FC = () => {
     setInterval(() => {
       if (isMutedRef.current || !audioContext.current) return;
       const track = tracks[currentSongIdx.current % tracks.length];
-      playSound(track[step % track.length], step % 8 < 4 ? 'sawtooth' : 'square', 0.15, 0.006);
+      playSound(track[step % track.length], step % 8 < 4 ? 'sawtooth' : 'square', 0.15, 0.005);
       step++;
       if (step % 64 === 0) currentSongIdx.current++;
-    }, 150);
+    }, 180);
   };
 
   const initLevel = useCallback((level: number, stats?: EntityStats, gold?: number, name?: string, activePet?: Pet, activeRelic?: Relic, inventory?: PotionEntity[]) => {
@@ -120,10 +129,27 @@ const App: React.FC = () => {
     let currentStats = stats ? { ...stats, armor: stats.maxArmor } : { ...INITIAL_PLAYER_STATS };
     let currentGold = gold ?? 0;
     let invSize = 5;
+    let startInventory = inventory || [];
+
+    if (level === 1) {
+        if (activeRelic?.id === 'slots') invSize = 10;
+        if (activeRelic?.id === 'gaze') {
+            startInventory.push({ id: 'relic-potion', percent: 70, x: 0, y: 0 });
+        }
+        if (activeRelic?.id === 'mark') {
+            currentGold += 60;
+            currentStats.maxHp = Math.floor(currentStats.maxHp * 0.9);
+            currentStats.hp = currentStats.maxHp;
+        }
+        if (activeRelic?.id === 'heart') {
+            currentStats.attack = Math.floor(currentStats.attack * 1.1);
+            currentStats.maxHp = Math.floor(currentStats.maxHp * 0.95);
+            currentStats.hp = Math.min(currentStats.hp, currentStats.maxHp);
+        }
+    }
 
     if (activeRelic?.id === 'slots') invSize = 10;
     
-    const startInv = inventory || [];
     const finalPlayerName = name || nameInput;
 
     const newState: GameState = {
@@ -137,14 +163,17 @@ const App: React.FC = () => {
       enemiesKilledInLevel: 0,
       gameStatus: (level === 1 && !stats) ? 'TUTORIAL' as const : 'PLAYING' as const,
       logs: (level === 1 && !stats) ? [`${finalPlayerName} entrou no abismo.`] : [`Descendo para o nível ${level}`],
-      inventory: startInv,
+      inventory: startInventory,
       inventorySize: invSize,
       activePet,
       activeRelic,
       language: currentLang,
       hasUsedAltarInLevel: false,
       activeAltarEffect: undefined,
-      keyPath: undefined
+      keyPath: undefined,
+      tronModeActive: false,
+      tronTimeLeft: 0,
+      tronTrail: []
     };
     
     playerPosRef.current = newState.playerPos;
@@ -182,7 +211,7 @@ const App: React.FC = () => {
           playChime();
           setMoveQueue(q => q.slice(1));
           playerPosRef.current = nextPos;
-          return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos, activePet: updatedPet, keyPath: undefined } as GameState;
+          return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos, activePet: updatedPet } as GameState;
         }
 
         const potion = prev.potions.find(p => p.x === nextPos.x && p.y === nextPos.y);
@@ -215,35 +244,28 @@ const App: React.FC = () => {
           }
         }
 
-        // Recalcular pegadas brilhantes se o efeito Olhos Abertos estiver ativo
-        let newKeyPath = prev.keyPath;
-        if (prev.activeAltarEffect?.id === 'open_eyes' && !prev.hasKey && prev.keyPos) {
-           const path = findDungeonPath(nextPos, prev.keyPos, prev.map, prev.enemies);
-           if (path) newKeyPath = path;
-        }
-
         setMoveQueue(q => q.slice(1));
         playerPosRef.current = nextPos;
-        return { ...prev, playerPos: nextPos, activePet: updatedPet, keyPath: newKeyPath } as GameState;
+        
+        let newTrail = prev.tronTrail || [];
+        if (prev.tronModeActive) {
+            newTrail = [...newTrail, oldPos].slice(-8);
+        }
+
+        return { ...prev, playerPos: nextPos, activePet: updatedPet, tronTrail: newTrail } as GameState;
       });
     };
 
-    const timer = setTimeout(moveStep, 80); 
+    const speed = gameState.tronModeActive ? 40 : 80;
+    const timer = setTimeout(moveStep, speed); 
     return () => clearTimeout(timer);
-  }, [moveQueue, gameState?.gameStatus, t]);
+  }, [moveQueue, gameState?.gameStatus, gameState?.tronModeActive, t]);
 
   const handleTileClick = (tx: number, ty: number) => {
     if (!gameState || gameState.gameStatus !== 'PLAYING') return;
-    
-    // O findDungeonPath original ignora inimigos apenas para visual, mas aqui precisamos considerar obstáculos
-    // Modifiquei findDungeonPath no dungeon.ts para sempre ignorar inimigos no cálculo do caminho para não "travar"
-    // Mas o loop de movimento acima interrompe se encontrar um inimigo no caminho.
     const path = findDungeonPath(playerPosRef.current, { x: tx, y: ty }, gameState.map, gameState.enemies);
-    if (path && path.length > 0) {
-      setMoveQueue(path);
-    } else {
-      setMoveQueue([]);
-    }
+    if (path && path.length > 0) setMoveQueue(path);
+    else setMoveQueue([]);
   };
 
   const onCombatFinish = (newStats: EntityStats, win: boolean, goldEarned: number, petHp?: number) => {
@@ -253,10 +275,18 @@ const App: React.FC = () => {
       
       const updatedPet = prev.activePet ? { ...prev.activePet, hp: petHp || 0 } : undefined;
       let finalGoldEarned = goldEarned;
+
+      if (prev.activeRelic?.id === 'bag') finalGoldEarned = Math.floor(finalGoldEarned * 1.05);
+      if (prev.activeRelic?.id === 'coin' && Math.random() < 0.05) finalGoldEarned += 15;
       if (prev.activeAltarEffect?.id === 'sacred_greed') finalGoldEarned = Math.floor(finalGoldEarned * 1.5);
       if (prev.activeAltarEffect?.id === 'cursed_greed') finalGoldEarned = Math.floor(finalGoldEarned * 0.5);
       
       let nextStats = { ...newStats };
+      if (prev.activeRelic?.id === 'vamp') {
+        const heal = Math.floor(nextStats.maxHp * 0.15);
+        nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + heal);
+      }
+
       if (prev.activeAltarEffect?.id === 'surrendered_blood') nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.3));
       if (prev.activeAltarEffect?.id === 'blood_tribute' && finalGoldEarned > 0) nextStats.hp = Math.max(1, nextStats.hp - 5);
 
@@ -282,20 +312,29 @@ const App: React.FC = () => {
     let used = false;
     setGameState(prev => {
       if (!prev || !prev.inventory[idx]) return prev;
+      const saveChance = prev.activeRelic?.id === 'save' && Math.random() < 0.05;
+
       if (prev.activeAltarEffect?.id === 'denied_offering') {
+        if (saveChance) return prev;
         const newInv = [...prev.inventory];
         newInv.splice(idx, 1);
         used = true;
         return { ...prev, activeAltarEffect: undefined, inventory: newInv } as GameState;
       }
+
       const pot = prev.inventory[idx];
       const stats = { ...prev.playerStats };
       let boost = pot.percent;
+      if (prev.activeRelic?.id === 'alch') boost += 5;
+      if (prev.activeRelic?.id === 'memory' && prev.level === 1 && prev.inventory.length === 1) boost *= 2;
       if (prev.activeAltarEffect?.id === 'profane_thirst') boost -= 10;
+      
       const heal = Math.floor(stats.maxHp * (boost / 100));
       stats.hp = Math.min(stats.maxHp, stats.hp + heal);
+      
       const newInv = [...prev.inventory];
-      if (prev.activeAltarEffect?.id !== 'accepted_offering') newInv.splice(idx, 1);
+      if (prev.activeAltarEffect?.id !== 'accepted_offering' && !saveChance) newInv.splice(idx, 1);
+      
       used = true;
       return { 
         ...prev, 
@@ -306,6 +345,39 @@ const App: React.FC = () => {
     });
     return used;
   };
+
+  const startRebirth = () => {
+    if (!gameState) return;
+    const options = [...RELICS_POOL].sort(() => 0.5 - Math.random()).slice(0, 3);
+    setGameState({ ...gameState, gameStatus: 'RELIC_SELECTION' as const, relicOptions: options });
+  };
+
+  const handleRelicSelect = (relic: Relic) => {
+    const stats = { ...INITIAL_PLAYER_STATS };
+    const oldStats = gameState?.lastStats;
+    if (relic.id === 'echo' && oldStats) {
+        stats.attack += Math.floor(oldStats.attack * 0.2);
+        stats.maxArmor += Math.floor(oldStats.maxArmor * 0.2);
+        stats.armor = stats.maxArmor;
+        stats.speed += Math.floor(oldStats.speed * 0.2);
+        stats.maxHp += Math.floor(oldStats.maxHp * 0.2);
+        stats.hp = stats.maxHp;
+    }
+    initLevel(1, stats, 0, nameInput, undefined, relic, []);
+  };
+
+  const handleShare = useCallback(() => {
+    const shareText = `RogueQuest - ${t.level}: ${gameState?.level}`;
+    if (navigator.share) {
+      navigator.share({
+        title: 'RogueQuest',
+        text: shareText,
+        url: window.location.href,
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(`${shareText} ${window.location.href}`);
+    }
+  }, [gameState?.level, t.level]);
 
   if (!gameState) return null;
 
@@ -351,7 +423,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {gameState.gameStatus !== 'START_SCREEN' && gameState.gameStatus !== 'WON' && gameState.gameStatus !== 'NEXT_LEVEL' && gameState.map.length > 0 && (
+      {gameState.gameStatus !== 'START_SCREEN' && gameState.gameStatus !== 'WON' && gameState.gameStatus !== 'NEXT_LEVEL' && gameState.gameStatus !== 'RELIC_SELECTION' && gameState.map.length > 0 && (
         <div className="max-w-[480px] mx-auto p-4 flex flex-col gap-4 min-h-screen">
           <header className="flex justify-between items-start py-4 px-1 border-b border-zinc-900 mb-2">
             <div className="flex flex-col">
@@ -368,19 +440,21 @@ const App: React.FC = () => {
           <GameMap 
             map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} 
             ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'} keyPath={gameState.keyPath} onTileClick={handleTileClick}
+            tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail}
           />
 
-          <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory}/>
+          <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}/>
         </div>
       )}
 
       {gameState.gameStatus === 'COMBAT' && gameState.currentEnemy && (
         <CombatModal 
           playerStats={gameState.playerStats} enemy={gameState.currentEnemy} activePet={gameState.activePet} language={currentLang} 
-          altarEffect={gameState.activeAltarEffect} inventory={gameState.inventory} onAttackSound={playAttackSound} 
+          altarEffect={gameState.activeAltarEffect} relic={gameState.activeRelic} inventory={gameState.inventory} onAttackSound={playAttackSound} 
           onUsePotion={usePotionFromInventory} onFinish={onCombatFinish}
         />
       )}
+      
       {gameState.gameStatus === 'CHEST_OPEN' && <ChestModal onChoice={(choice) => {
           setGameState(prev => {
             if (!prev) return prev;
@@ -431,7 +505,7 @@ const App: React.FC = () => {
           }}
           onBuyPet={(type) => {
              const pet: Pet = { type, name: type, hp: 50, maxHp: 50, pos: { ...playerPosRef.current } };
-             setGameState(prev => prev ? { ...prev, gold: prev.gold - (type === 'CORUJA' ? 12 : 10), activePet: pet } as GameState : null);
+             setGameState(prev => prev ? { ...prev, gold: prev.gold - 10, activePet: pet } as GameState : null);
           }}
           onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)}
         />
@@ -471,15 +545,9 @@ const App: React.FC = () => {
           }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)} 
         />
       )}
+      
       {gameState.gameStatus === 'ALTAR_RESULT' && gameState.activeAltarEffect && (
         <AltarResultModal effect={gameState.activeAltarEffect} language={currentLang} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)} />
-      )}
-      
-      {gameState.gameStatus === 'WON' && (
-        <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in">
-          <div className="text-center space-y-2"><h2 className="text-6xl font-black text-green-500 tracking-tighter uppercase">VITÓRIA</h2><p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">VOCÊ CONQUISTOU O ABISMO</p></div>
-          <button onClick={() => { localStorage.removeItem('rq_save_v150_final'); window.location.reload(); }} className="w-full py-5 bg-green-600 text-white font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-green-500 transition-all">REINICIAR LENDA</button>
-        </div>
       )}
       
       {gameState.gameStatus === 'LOST' && (
@@ -515,33 +583,11 @@ const App: React.FC = () => {
                 <span className="text-[10px] font-bold text-zinc-500 uppercase">{t.armor}</span>
                 <span className="text-xl font-black text-blue-500">{gameState.lastStats?.maxArmor || 0}</span>
               </div>
-              <div className="bg-black/40 p-4 rounded-2xl border border-zinc-800/50 flex flex-col items-center gap-1 col-span-2">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase">{t.vel}</span>
-                <span className="text-xl font-black text-green-500">{gameState.lastStats?.speed || 0}</span>
-              </div>
             </div>
-
-            {gameState.activeRelic && (
-              <div className="bg-purple-950/10 border border-purple-500/20 p-4 rounded-2xl flex items-center gap-4">
-                <div className="text-purple-400">
-                  {React.createElement((Icon as any)[gameState.activeRelic.icon], { width: 24, height: 24 })}
-                </div>
-                <div className="text-left">
-                  <p className="text-[8px] font-black text-purple-500 uppercase tracking-widest">{t.relic_active}</p>
-                  <p className="text-xs font-black text-white uppercase">{gameState.activeRelic.name}</p>
-                </div>
-              </div>
-            )}
 
             <div className="flex flex-col gap-3">
               <button 
-                onClick={handleShare} 
-                className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-black rounded-xl uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all border border-zinc-700"
-              >
-                <Icon.Share width={14} height={14} /> COMPARTILHAR CONQUISTA
-              </button>
-              <button 
-                onClick={() => { localStorage.removeItem('rq_save_v150_final'); window.location.reload(); }} 
+                onClick={startRebirth} 
                 className="w-full py-5 bg-red-800 text-white font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-red-700 transition-all shadow-[0_0_20px_rgba(185,28,28,0.3)]"
               >
                 {t.rebirth}
@@ -551,21 +597,8 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {gameState.gameStatus === 'NEXT_LEVEL' && (
-        <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in">
-          <div className="text-center space-y-4">
-            <h2 className="text-4xl font-black text-red-600 tracking-tighter uppercase animate-pulse">
-              Descendo para o próximo nível...
-            </h2>
-            <p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">Alcançando profundidade {gameState.level + 1}</p>
-          </div>
-          <button 
-            onClick={() => initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, gameState.activeRelic, gameState.inventory)} 
-            className="w-full max-w-xs py-5 bg-white text-black font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"
-          >
-            Prosseguir
-          </button>
-        </div>
+      {gameState.gameStatus === 'RELIC_SELECTION' && gameState.relicOptions && (
+        <RelicSelectionModal options={gameState.relicOptions} language={currentLang} onSelect={handleRelicSelect} />
       )}
 
       {gameState.gameStatus === 'TUTORIAL' && <TutorialModal onFinish={() => setGameState({...gameState, gameStatus: 'PLAYING' as const})} language={currentLang} />}
@@ -595,7 +628,6 @@ const App: React.FC = () => {
           <div className="bg-zinc-900 border-2 border-red-500 p-8 rounded-3xl max-w-xs w-full text-center space-y-4 animate-in zoom-in-95">
              <div className="text-red-500 flex justify-center scale-150 mb-2"><Icon.Backpack /></div>
              <h3 className="text-white font-black uppercase text-sm">Inventário Cheio!</h3>
-             <p className="text-zinc-500 text-xs">{t.inventory_full}</p>
              <button onClick={() => setInventoryFullAlert(false)} className="w-full py-3 bg-red-600 text-white font-black rounded-xl uppercase text-xs">OK</button>
           </div>
         </div>

@@ -8,52 +8,54 @@ const BIOME_ORDER: LevelTheme[] = [
 ];
 
 export function generateDungeon(level: number) {
-  const currentWidth = Math.min(31 + Math.floor(level / 2) * 2, 81); // Dimensões ímpares para o algoritmo de maze
-  const currentHeight = Math.min(25 + Math.floor(level / 3) * 2, 61);
+  const currentWidth = Math.min(45 + Math.floor(level / 2), 85);
+  const currentHeight = Math.min(35 + Math.floor(level / 3), 55);
   const targetEnemies = 10 + Math.floor(level / 2);
 
   const map: TileType[][] = Array(MAP_HEIGHT).fill(0).map(() => Array(MAP_WIDTH).fill('WALL'));
 
-  // Algoritmo de Labirinto (Recursive Backtracker)
-  const maze: boolean[][] = Array(currentHeight).fill(0).map(() => Array(currentWidth).fill(false));
-  const stack: [number, number][] = [];
-  const startMazeX = 1, startMazeY = 1;
-  
-  maze[startMazeY][startMazeX] = true;
-  stack.push([startMazeX, startMazeY]);
+  // Procedural Room Generation
+  const rooms: { x: number, y: number, w: number, h: number }[] = [];
+  const numRooms = 8 + Math.floor(level / 5);
 
-  while (stack.length > 0) {
-    const [cx, cy] = stack[stack.length - 1];
-    const neighbors: [number, number, number, number][] = [];
+  for (let i = 0; i < numRooms; i++) {
+    const w = Math.floor(Math.random() * 6) + 4;
+    const h = Math.floor(Math.random() * 6) + 4;
+    const x = Math.floor(Math.random() * (currentWidth - w - 2)) + 1;
+    const y = Math.floor(Math.random() * (currentHeight - h - 2)) + 1;
 
-    // Direções: [nx, ny, mx, my] (alvo e ponto médio)
-    if (cx + 2 < currentWidth - 1 && !maze[cy][cx + 2]) neighbors.push([cx + 2, cy, cx + 1, cy]);
-    if (cx - 2 > 0 && !maze[cy][cx - 2]) neighbors.push([cx - 2, cy, cx - 1, cy]);
-    if (cy + 2 < currentHeight - 1 && !maze[cy + 2][cx]) neighbors.push([cx, cy + 2, cx, cy + 1]);
-    if (cy - 2 > 0 && !maze[cy - 2][cx]) neighbors.push([cx, cy - 2, cx, cy - 1]);
-
-    if (neighbors.length > 0) {
-      const [nx, ny, mx, my] = neighbors[Math.floor(Math.random() * neighbors.length)];
-      maze[ny][nx] = true;
-      maze[my][mx] = true;
-      stack.push([nx, ny]);
-    } else {
-      stack.pop();
-    }
-  }
-
-  // Converter labirinto booleano para o mapa do jogo e criar "atalhos"
-  for (let y = 0; y < currentHeight; y++) {
-    for (let x = 0; x < currentWidth; x++) {
-      if (maze[y][x]) {
-        map[y][x] = 'FLOOR';
-      } else if (x > 0 && x < currentWidth - 1 && y > 0 && y < currentHeight - 1) {
-        if (Math.random() < 0.08) map[y][x] = 'FLOOR';
+    // Check overlap
+    const overlap = rooms.some(r => x < r.x + r.w + 1 && x + w + 1 > r.x && y < r.y + r.h + 1 && y + h + 1 > r.y);
+    if (!overlap) {
+      rooms.push({ x, y, w, h });
+      for (let ry = y; ry < y + h; ry++) {
+        for (let rx = x; rx < x + w; rx++) {
+          map[ry][rx] = 'FLOOR';
+        }
       }
     }
   }
 
-  // Seleção aleatória de tema para cada nível
+  // Connect Rooms with Tunnels
+  for (let i = 0; i < rooms.length - 1; i++) {
+    let start = rooms[i];
+    let end = rooms[i + 1];
+    let cx = Math.floor(start.x + start.w / 2);
+    let cy = Math.floor(start.y + start.h / 2);
+    let tx = Math.floor(end.x + end.w / 2);
+    let ty = Math.floor(end.y + end.h / 2);
+
+    while (cx !== tx) {
+      map[cy][cx] = 'FLOOR';
+      cx += cx < tx ? 1 : -1;
+    }
+    while (cy !== ty) {
+      map[cy][cx] = 'FLOOR';
+      cy += cy < ty ? 1 : -1;
+    }
+  }
+
+  // Random Biome
   const theme = BIOME_ORDER[Math.floor(Math.random() * BIOME_ORDER.length)];
 
   const occupied = new Set<string>();
@@ -65,6 +67,10 @@ export function generateDungeon(level: number) {
         occupied.add(`${rx},${ry}`);
         return { x: rx, y: ry };
       }
+    }
+    // Fallback if needed
+    if (rooms.length > 0) {
+        return { x: rooms[0].x, y: rooms[0].y };
     }
     return { x: 1, y: 1 };
   };

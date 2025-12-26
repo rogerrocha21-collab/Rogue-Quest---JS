@@ -59,7 +59,6 @@ const GameMap: React.FC<GameMapProps> = ({
     const isTrail = tronModeActive && tronTrail.some(tp => tp.x === x && tp.y === y);
     const isKeyPath = !hasKey && keyPath.some(kp => kp.x === x && kp.y === y);
 
-    // Fog of War for Ritual Darkness
     let fogOpacity = "opacity-100";
     if (ritualDarkness) {
         const dist = Math.sqrt(Math.pow(x - playerPos.x, 2) + Math.pow(y - playerPos.y, 2));
@@ -80,7 +79,7 @@ const GameMap: React.FC<GameMapProps> = ({
           </span>
         ) : isPet ? (
           <span className={`${TILE_COLORS.PET} animate-pet-wiggle z-10 scale-90`}>
-            {activePet.type === 'LOBO' ? <Icon.Wolf /> : activePet.type === 'PUMA' ? <Icon.Puma /> : <Icon.Owl />}
+            {activePet.type === 'LOBO' ? <Icon.Wolf /> : activePet.type === 'PUMA' ? <Icon.Puma /> : <Icon.Corvo />}
           </span>
         ) : enemy ? (
           <span className={`${TILE_COLORS.ENEMY} drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] z-10`}><Icon.Enemy /></span>
