@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [currentLang, setCurrentLang] = useState<Language>('PT');
   const [moveQueue, setMoveQueue] = useState<Position[]>([]);
+  const [isNewGameMode, setIsNewGameMode] = useState(false);
   const audioContext = useRef<AudioContext | null>(null);
   const currentSongIdx = useRef<number>(0);
   const isMutedRef = useRef(false);
@@ -27,10 +28,12 @@ const App: React.FC = () => {
       const saved = localStorage.getItem('rq_save_mobile_v2');
       if (saved) {
         const data = JSON.parse(saved);
+        // Load the saved state but stay on start screen
         setGameState({ ...data, gameStatus: 'START_SCREEN' });
         setNameInput(data.playerName || '');
         if (data.language) setCurrentLang(data.language);
       } else {
+        // Initial blank state
         setGameState({
           playerName: '', gold: 0, level: 1, theme: 'VOID', playerPos: {x:0,y:0},
           playerStats: { ...INITIAL_PLAYER_STATS }, map: [], enemies: [], chests: [],
@@ -39,6 +42,7 @@ const App: React.FC = () => {
           tronModeActive: false, tronTimeLeft: 0, tronTrail: [], language: 'PT',
           inventory: [], inventorySize: 5
         });
+        setIsNewGameMode(true);
       }
     } catch (e) {
       console.error("Erro ao carregar save:", e);
@@ -223,6 +227,7 @@ const App: React.FC = () => {
         return { ...prev, gameStatus: 'COMBAT', currentEnemy: enemy };
       }
 
+      // Fix: Changed 'y' to 'ny' as it refers to the target Y coordinate.
       const chest = prev.chests.find(c => c.x === nx && c.y === ny);
       if (chest) {
         setMoveQueue([]);
@@ -411,7 +416,22 @@ const App: React.FC = () => {
     initLevel(1, undefined, 0, gameState.playerName, undefined, relic, []);
   };
 
+  const handleContinue = () => {
+    if (!gameState) return;
+    startMusic();
+    setGameState({ ...gameState, gameStatus: 'PLAYING' });
+  };
+
+  const handleStartNew = () => {
+    if (!nameInput.trim()) return;
+    startMusic();
+    initLevel(1, undefined, 0, nameInput);
+  };
+
   if (!gameState) return <div className="bg-black min-h-screen" />;
+
+  // Fix: Replaced 'hasExistingSave' with 'hasSave' to match the usage in the JSX.
+  const hasSave = gameState.map && gameState.map.length > 0;
 
   return (
     <div className="bg-black min-h-screen text-zinc-300 font-sans selection:bg-red-500/30 overflow-x-hidden">
@@ -428,33 +448,67 @@ const App: React.FC = () => {
             
             <div className="bg-[#0f0f0f] border border-zinc-800 rounded-[2.5rem] p-10 space-y-8 shadow-2xl">
               <div className="space-y-6">
-                <div className="relative group">
-                  <input 
-                    type="text" 
-                    maxLength={12} 
-                    placeholder={t.hero_placeholder}
-                    value={nameInput}
-                    onChange={e => setNameInput(e.target.value.toUpperCase())}
-                    className="w-full bg-[#0a0a0a] border-2 border-zinc-800 rounded-2xl py-5 px-6 text-center text-base font-mono text-white placeholder-zinc-700 focus:border-red-600 transition-all outline-none"
-                  />
-                  <div className="absolute inset-0 border-2 border-transparent pointer-events-none rounded-2xl group-focus-within:border-red-600/50" />
-                </div>
+                
+                {hasSave && !isNewGameMode ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
+                      <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Herói Ativo</p>
+                      <p className="text-sm font-black text-white">{gameState.playerName}</p>
+                      <p className="text-[10px] font-bold text-red-800 uppercase">Profundidade: {gameState.level}</p>
+                    </div>
 
-                <div className="space-y-4">
-                  <button 
-                    onClick={() => { startMusic(); initLevel(1, undefined, 0, nameInput); }}
-                    disabled={!nameInput.trim()}
-                    className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95 disabled:opacity-30 disabled:grayscale"
-                  >
-                    {gameState.level > 1 ? t.continue_journey : t.start_journey}
-                  </button>
-                  
-                  <button 
-                    className="w-full bg-[#1e1e1e] hover:bg-[#2a2a2a] py-5 rounded-2xl text-zinc-500 font-mono font-bold text-[10px] uppercase tracking-widest transition-all"
-                  >
-                    {t.feedback}
-                  </button>
-                </div>
+                    <button 
+                      onClick={handleContinue}
+                      className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95"
+                    >
+                      {t.continue_journey}
+                    </button>
+                    
+                    <button 
+                      onClick={() => setIsNewGameMode(true)}
+                      className="w-full bg-[#1e1e1e] hover:bg-[#2a2a2a] py-5 rounded-2xl text-zinc-500 font-mono font-bold text-[10px] uppercase tracking-widest transition-all"
+                    >
+                      {t.new_game}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="relative group">
+                      <input 
+                        type="text" 
+                        maxLength={12} 
+                        placeholder={t.hero_placeholder}
+                        value={nameInput}
+                        onChange={e => setNameInput(e.target.value.toUpperCase())}
+                        className="w-full bg-[#0a0a0a] border-2 border-zinc-800 rounded-2xl py-5 px-6 text-center text-base font-mono text-white placeholder-zinc-700 focus:border-red-600 transition-all outline-none"
+                      />
+                      <div className="absolute inset-0 border-2 border-transparent pointer-events-none rounded-2xl group-focus-within:border-red-600/50" />
+                    </div>
+
+                    <button 
+                      onClick={handleStartNew}
+                      disabled={!nameInput.trim()}
+                      className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95 disabled:opacity-30 disabled:grayscale"
+                    >
+                      {t.start_journey}
+                    </button>
+
+                    {hasSave && (
+                      <button 
+                        onClick={() => setIsNewGameMode(false)}
+                        className="w-full bg-transparent text-zinc-600 font-mono font-bold text-[10px] uppercase tracking-widest hover:text-zinc-400 transition-colors"
+                      >
+                        Voltar para save
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <button 
+                  className="w-full bg-transparent text-zinc-700 font-mono font-bold text-[10px] uppercase tracking-widest hover:text-zinc-500 transition-all"
+                >
+                  {t.feedback}
+                </button>
               </div>
 
               <div className="flex justify-center gap-8 pt-4 border-t border-zinc-900">
