@@ -3,7 +3,7 @@ import { LevelTheme, Language, Relic, AltarEffect } from './types';
 
 export const MAP_WIDTH = 45; 
 export const MAP_HEIGHT = 25;
-export const MAX_LEVELS = 150;
+export const MAX_LEVELS = 15;
 
 export const INITIAL_PLAYER_STATS = {
   hp: 120,
@@ -296,7 +296,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     final_stats: "FINAL STATS",
     blood: "BLOOD",
     key: "KEY",
-    combat_dealt: "dealt",
+    combat_dealt: "deals",
     combat_damage: "damage",
     combat_absorbed: "absorbed",
     combat_player: "You",
@@ -369,7 +369,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     relic_active: "RELIQUIA ACTIVA",
     hero_placeholder: "NOMBRE DEL HÉROE",
     continue_journey: "Continuar Jornada",
-    new_game: "Nuevo Juego",
+    new_game: "Nuevo Jogo",
     start_journey: "Iniciar Jornada",
     feedback: "Feedback",
     abyss: "El Abismo Infinito",
@@ -407,7 +407,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     theme_desert: 'Dunas Eternas',
     theme_forest: 'Bosque Sombrío',
     theme_inferno: 'Zona Infernal',
-    theme_ruins: 'Ruinas Antiguas',
+    theme_ruins: 'Ruínas Antigas',
     theme_void: 'Abismo / Vacío',
     theme_mechanical: 'Complejo Mecánico',
     theme_corrupted: 'Zona Corrompida',
@@ -416,7 +416,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     theme_astral: 'Plano Astral',
     theme_matrix: 'Sistema Matrix',
     final_stats: "ESTATÍSTICAS FINAIS",
-    blood: "SANGUE",
+    blood: "SANGRE",
     key: "LLAVE",
     combat_dealt: "causó",
     combat_damage: "de daño",
@@ -458,7 +458,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     b_merchant_name: "Bendición del Mercader",
     b_merchant_desc: "Generosos descuentos con el Mercador.",
     b_chest_name: "Cofre Consagrado",
-    b_chest_desc: "El próximo cofre tendrá bonificaciones dobles.",
+    b_chest_desc: "El primer cofre tendrá bonos dobles.",
     c_fragile_name: "Sangre Frágil",
     c_fragile_desc: "Recibes +10% de daño.",
     c_hands_name: "Manos Temblorosas",

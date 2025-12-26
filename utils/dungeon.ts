@@ -3,19 +3,8 @@ import { MAP_WIDTH, MAP_HEIGHT, MAX_LEVELS, ENEMY_TYPES } from '../constants';
 import { TileType, Enemy, Chest, EntityStats, PotionEntity, ItemEntity, LevelTheme, Position } from '../types';
 
 const BIOME_ORDER: LevelTheme[] = [
-  'CAVE',        // 1-12
-  'FOREST',      // 13-24
-  'SNOW',        // 25-36
-  'DESERT',      // 37-48
-  'RUINS',       // 49-60
-  'CATACOMBS',   // 61-72
-  'OSSUARY',     // 73-84
-  'MECHANICAL',  // 85-96
-  'CORRUPTED',   // 97-108
-  'INFERNO',     // 109-120
-  'ASTRAL',      // 121-132
-  'MATRIX',      // 133-144
-  'VOID'         // 145-150
+  'CAVE', 'FOREST', 'SNOW', 'DESERT', 'RUINS', 'CATACOMBS', 
+  'OSSUARY', 'MECHANICAL', 'CORRUPTED', 'INFERNO', 'ASTRAL', 'MATRIX', 'VOID'
 ];
 
 export function generateDungeon(level: number) {
@@ -90,27 +79,22 @@ export function generateDungeon(level: number) {
     merchantPos = { x: mRoom.x, y: mRoom.y };
   }
 
-  let targetEnemies = 2 + Math.floor(level / 10);
-  if (level > 30) targetEnemies += 2;
-  if (level > 70) targetEnemies += 4;
-  if (level > 121) targetEnemies += 6; 
-
+  let targetEnemies = 15; // Garantido 15 inimigos por andar
   let placed = 0;
   let attempts = 0;
-  while (placed < targetEnemies && attempts < 1000) {
+  while (placed < targetEnemies && attempts < 3000) {
     attempts++;
     const rx = Math.floor(Math.random() * MAP_WIDTH);
-    const ry = Math.floor(MAP_HEIGHT * Math.random());
-    if (map[ry] && map[ry][rx] === 'FLOOR' && !(rx === playerPos.x && ry === playerPos.y) && !(rx === stairsPos.x && ry === stairsPos.y)) {
+    const ry = Math.floor(Math.random() * MAP_HEIGHT);
+    if (map[ry][rx] === 'FLOOR' && !(rx === playerPos.x && ry === playerPos.y) && !(rx === stairsPos.x && ry === stairsPos.y)) {
       const types = ENEMY_TYPES.filter(t => t.minLevel <= level);
       const type = types[Math.floor(Math.random() * types.length)].name;
-      const isElite = level > 120 && Math.random() > 0.7;
       enemies.push({
         id: `e-${level}-${placed}`,
         x: rx, y: ry,
-        type: isElite ? `ELITE ${type}` : type,
-        stats: generateEnemyStats(level, isElite),
-        isBoss: isElite
+        type: type,
+        stats: generateEnemyStats(level, false),
+        isBoss: false
       });
       placed++;
     }
@@ -134,9 +118,6 @@ function generateEnemyStats(level: number, isElite: boolean): EntityStats {
   return { hp, maxHp: hp, attack: atk, armor: arm, maxArmor: arm, speed: spd };
 }
 
-/**
- * Real Pathfinding (BFS) que respeita paredes e inimigos.
- */
 export function findDungeonPath(start: Position, end: Position, map: TileType[][], enemies: Enemy[]): Position[] | null {
   if (start.x === end.x && start.y === end.y) return null;
 
@@ -144,27 +125,26 @@ export function findDungeonPath(start: Position, end: Position, map: TileType[][
   const visited = new Set<string>();
   visited.add(`${start.x},${start.y}`);
 
+  const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
   while (queue.length > 0) {
-    const current = queue.shift()!;
-    const { pos, path } = current;
+    const { pos, path } = queue.shift()!;
 
     if (pos.x === end.x && pos.y === end.y) {
       return path;
     }
 
-    const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-    for (const [dx, dy] of neighbors) {
+    for (const [dx, dy] of directions) {
       const nx = pos.x + dx;
       const ny = pos.y + dy;
       const key = `${nx},${ny}`;
 
-      if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT && map[ny] && !visited.has(key)) {
-        const isWall = map[ny][nx] === 'WALL';
-        // Inimigos bloqueiam o caminho, exceto se forem o destino final do clique
+      if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT && map[ny][nx] !== 'WALL' && !visited.has(key)) {
         const hasEnemy = enemies.some(e => e.x === nx && e.y === ny);
-        const isDestination = nx === end.x && ny === end.y;
+        const isTarget = nx === end.x && ny === end.y;
 
-        if (!isWall && (!hasEnemy || isDestination)) {
+        // Só pode entrar no tile se não tiver inimigo, OU se o inimigo for o alvo do clique (para iniciar combate)
+        if (!hasEnemy || isTarget) {
           visited.add(key);
           queue.push({ 
             pos: { x: nx, y: ny }, 
