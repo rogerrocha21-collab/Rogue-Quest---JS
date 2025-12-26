@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameState, Position, EntityStats, StatChoice, LevelTheme, ItemEntity, PotionEntity, Pet, Language, Relic } from './types';
 import { INITIAL_PLAYER_STATS, MAX_LEVELS, MAP_WIDTH, MAP_HEIGHT, THEME_CONFIG, TRANSLATIONS, RELICS_POOL } from './constants';
@@ -13,6 +12,7 @@ const App: React.FC = () => {
   const [nameInput, setNameInput] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [currentLang, setCurrentLang] = useState<Language>('PT');
+  const [moveQueue, setMoveQueue] = useState<Position[]>([]);
   const audioContext = useRef<AudioContext | null>(null);
   const audioInterval = useRef<any>(null);
   const currentSongIdx = useRef<number>(0);
@@ -140,6 +140,7 @@ const App: React.FC = () => {
     };
     setGameState(newState);
     saveGame(newState);
+    setMoveQueue([]);
   }, [nameInput, currentLang, gameState?.lastStats]);
 
   const usePotion = (pot: PotionEntity) => {
@@ -170,9 +171,13 @@ const App: React.FC = () => {
     if (!gameState || gameState.gameStatus !== 'PLAYING') return;
     const { playerPos, map, enemies, potions, keyPos, merchantPos, hasKey, stairsPos, enemiesKilledInLevel, chests, tronModeActive, tronTrail = [], activePet } = gameState;
     const nx = playerPos.x + dx; const ny = playerPos.y + dy;
-    if (nx < 0 || nx >= MAP_WIDTH || ny < 0 || ny >= MAP_HEIGHT || map[ny][nx] === 'WALL') return;
+    if (nx < 0 || nx >= MAP_WIDTH || ny < 0 || ny >= MAP_HEIGHT || map[ny][nx] === 'WALL') {
+      setMoveQueue([]);
+      return;
+    }
     const enemy = enemies.find(e => e.x === nx && e.y === ny);
     if (enemy) { 
+        setMoveQueue([]);
         if (tronModeActive) {
             const goldGain = Math.floor(Math.random() * 8) + 12; playCoinSound();
             setGameState({ ...gameState, gold: gameState.gold + goldGain, enemies: enemies.filter(e => e.id !== enemy.id), enemiesKilledInLevel: enemiesKilledInLevel + 1, playerPos: { x: nx, y: ny }, tronTrail: [...tronTrail, playerPos], activePet: activePet ? { ...activePet, pos: playerPos } : undefined, logs: [...gameState.logs, `${t.log_trampled} +${goldGain}G`] });
@@ -180,19 +185,91 @@ const App: React.FC = () => {
         } else { setGameState({ ...gameState, gameStatus: 'COMBAT', currentEnemy: enemy }); return; }
     }
     const pot = potions.find(p => p.x === nx && p.y === ny);
-    if (pot) { setGameState({ ...gameState, gameStatus: 'PICKUP_CHOICE', currentPotion: pot, playerPos: { x: nx, y: ny } }); return; }
+    if (pot) { setMoveQueue([]); setGameState({ ...gameState, gameStatus: 'PICKUP_CHOICE', currentPotion: pot, playerPos: { x: nx, y: ny } }); return; }
     if (keyPos && nx === keyPos.x && ny === keyPos.y && !hasKey) { playChime(); setGameState({ ...gameState, hasKey: true, logs: [...gameState.logs, t.log_key], playerPos: { x: nx, y: ny } }); return; }
-    if (merchantPos && nx === merchantPos.x && ny === merchantPos.y) { setGameState({ ...gameState, gameStatus: 'MERCHANT_SHOP', playerPos: { x: nx, y: ny } }); return; }
+    if (merchantPos && nx === merchantPos.x && ny === merchantPos.y) { setMoveQueue([]); setGameState({ ...gameState, gameStatus: 'MERCHANT_SHOP', playerPos: { x: nx, y: ny } }); return; }
     const chest = chests.find(c => c.x === nx && c.y === ny);
-    if (chest) { setGameState({ ...gameState, gameStatus: 'CHEST_OPEN', playerPos: { x: nx, y: ny }, chests: chests.filter(c => c.id !== chest.id) }); return; }
+    if (chest) { setMoveQueue([]); setGameState({ ...gameState, gameStatus: 'CHEST_OPEN', playerPos: { x: nx, y: ny }, chests: chests.filter(c => c.id !== chest.id) }); return; }
     if (nx === stairsPos.x && ny === stairsPos.y) {
         if (hasKey && enemiesKilledInLevel >= 1) {
+            setMoveQueue([]);
             if (gameState.level >= MAX_LEVELS) setGameState({ ...gameState, gameStatus: 'WON' });
             else setGameState({ ...gameState, gameStatus: 'NEXT_LEVEL' });
-        } else { setGameState({ ...gameState, logs: [...gameState.logs, t.log_locked], playerPos: { x: nx, y: ny } }); } return;
+        } else { setGameState({ ...gameState, logs: [...gameState.logs, t.log_locked], playerPos: { x: nx, y: ny } }); setMoveQueue([]); } return;
     }
     setGameState({ ...gameState, playerPos: { x: nx, y: ny }, tronTrail: tronModeActive ? [...tronTrail, playerPos] : tronTrail, activePet: activePet ? { ...activePet, pos: playerPos } : undefined });
   };
+
+  const findPath = (start: Position, end: Position): Position[] | null => {
+    if (!gameState) return null;
+    const { map, enemies } = gameState;
+    const q: { pos: Position; path: Position[] }[] = [{ pos: start, path: [] }];
+    const visited = new Set<string>();
+    visited.add(`${start.x},${start.y}`);
+
+    while (q.length > 0) {
+      const { pos, path } = q.shift()!;
+      if (pos.x === end.x && pos.y === end.y) return path;
+
+      for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        const nx = pos.x + dx;
+        const ny = pos.y + dy;
+        const key = `${nx},${ny}`;
+
+        if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT && 
+            map[ny][nx] !== 'WALL' && !visited.has(key)) {
+          
+          const hasEnemy = enemies.some(e => e.x === nx && e.y === ny);
+          if (hasEnemy && (nx !== end.x || ny !== end.y)) continue;
+
+          visited.add(key);
+          q.push({ pos: { x: nx, y: ny }, path: [...path, { x: nx, y: ny }] });
+        }
+      }
+    }
+    return null;
+  };
+
+  const handleTileClick = (tx: number, ty: number) => {
+    if (!gameState || gameState.gameStatus !== 'PLAYING') return;
+    const path = findPath(gameState.playerPos, { x: tx, y: ty });
+    if (path && path.length > 0) {
+      setMoveQueue(path);
+    }
+  };
+
+  useEffect(() => {
+    if (moveQueue.length > 0 && gameState?.gameStatus === 'PLAYING') {
+      const timer = setTimeout(() => {
+        const next = moveQueue[0];
+        const dx = next.x - gameState.playerPos.x;
+        const dy = next.y - gameState.playerPos.y;
+        
+        if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && (Math.abs(dx) + Math.abs(dy) > 0)) {
+           movePlayer(dx, dy);
+           setMoveQueue(prev => prev.slice(1));
+        } else {
+           setMoveQueue([]);
+        }
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [moveQueue, gameState?.playerPos, gameState?.gameStatus]);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+        setMoveQueue([]);
+      }
+      if (k === 'w' || k === 'arrowup') movePlayer(0, -1);
+      if (k === 's' || k === 'arrowdown') movePlayer(0, 1);
+      if (k === 'a' || k === 'arrowleft') movePlayer(-1, 0);
+      if (k === 'd' || k === 'arrowright') movePlayer(1, 0);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [gameState]);
 
   const handleDeath = () => {
     if (!gameState) return;
@@ -239,7 +316,7 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <GameMap map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} activePet={gameState.activePet} onTileClick={(x,y) => movePlayer(x-gameState.playerPos.x, y-gameState.playerPos.y)} />
+        <GameMap map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} activePet={gameState.activePet} onTileClick={handleTileClick} />
         <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} onUsePotion={(i) => {
           const pot = gameState.inventory[i];
           usePotion(pot);
@@ -256,11 +333,19 @@ const App: React.FC = () => {
         {gameState.gameStatus === 'LOST' && (
           <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center p-8 z-[100] animate-in fade-in duration-1000">
             <h2 className="text-6xl font-black text-red-600 mb-2 italic tracking-tighter drop-shadow-[0_0_50px_rgba(220,38,38,0.8)] uppercase">{t.death_title}</h2>
-            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-xs mb-8 space-y-3">
+            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-xs mb-8 space-y-3 shadow-[0_0_30px_rgba(0,0,0,1)]">
                <h3 className="text-zinc-400 text-center font-black text-xs border-b border-zinc-800 pb-2 mb-4 uppercase">{t.final_stats}</h3>
                <div className="flex justify-between text-[10px] font-bold"><span>{t.level.toUpperCase()}</span><span className="text-white">{gameState.level}</span></div>
-               <div className="flex justify-between text-[10px] font-bold"><span>{t.hp}</span><span className="text-red-400">{gameState.playerStats.maxHp}</span></div>
+               <div className="flex justify-between text-[10px] font-bold"><span>{t.hp}</span><span className="text-red-400">{gameState.playerStats.hp}/{gameState.playerStats.maxHp}</span></div>
                <div className="flex justify-between text-[10px] font-bold"><span>{t.atk}</span><span className="text-yellow-400">{gameState.playerStats.attack}</span></div>
+               <div className="flex justify-between text-[10px] font-bold"><span>{t.armor}</span><span className="text-blue-400">{gameState.playerStats.maxArmor}</span></div>
+               <div className="flex justify-between text-[10px] font-bold"><span>{t.vel}</span><span className="text-green-400">{gameState.playerStats.speed}</span></div>
+               {gameState.activeRelic && (
+                 <div className="flex justify-between text-[10px] font-bold border-t border-zinc-800 pt-2">
+                   <span>RELÍQUIA</span>
+                   <span className="text-purple-400 uppercase">{gameState.activeRelic.name}</span>
+                 </div>
+               )}
             </div>
             <button onClick={handleDeath} className="bg-white text-black px-12 py-4 rounded-full font-black text-xs uppercase tracking-widest">{t.rebirth}</button>
           </div>
