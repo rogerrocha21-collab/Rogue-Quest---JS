@@ -1,5 +1,5 @@
 
-export type TileType = 'WALL' | 'FLOOR' | 'PLAYER' | 'ENEMY' | 'CHEST' | 'STAIRS' | 'POTION' | 'ITEM' | 'KEY' | 'MERCHANT' | 'EMPTY';
+export type TileType = 'WALL' | 'FLOOR' | 'PLAYER' | 'ENEMY' | 'CHEST' | 'STAIRS' | 'POTION' | 'ITEM' | 'KEY' | 'MERCHANT' | 'EMPTY' | 'ALTAR';
 
 export type LevelTheme = 'FOREST' | 'DESERT' | 'SNOW' | 'CAVE' | 'MATRIX' | 'INFERNO' | 'VOID';
 
@@ -61,6 +61,13 @@ export interface Relic {
   icon: string;
 }
 
+export interface AltarEffect {
+  id: string;
+  type: 'BLESSING' | 'CURSE';
+  nameKey: string;
+  descKey: string;
+}
+
 export interface GameState {
   playerName: string;
   gold: number;
@@ -74,11 +81,12 @@ export interface GameState {
   potions: PotionEntity[];
   items: ItemEntity[];
   merchantPos?: Position;
+  altarPos?: Position;
   keyPos?: Position;
   hasKey: boolean;
   enemiesKilledInLevel: number;
   stairsPos: Position;
-  gameStatus: 'START_SCREEN' | 'TUTORIAL' | 'PLAYING' | 'COMBAT' | 'CHEST_OPEN' | 'MERCHANT_SHOP' | 'WON' | 'LOST' | 'NEXT_LEVEL' | 'PICKUP_CHOICE' | 'RELIC_SELECTION';
+  gameStatus: 'START_SCREEN' | 'TUTORIAL' | 'PLAYING' | 'COMBAT' | 'CHEST_OPEN' | 'MERCHANT_SHOP' | 'WON' | 'LOST' | 'NEXT_LEVEL' | 'PICKUP_CHOICE' | 'RELIC_SELECTION' | 'ALTAR_INTERACTION' | 'ALTAR_RESULT';
   currentEnemy?: Enemy;
   currentPotion?: PotionEntity;
   logs: string[];
@@ -92,6 +100,9 @@ export interface GameState {
   activeRelic?: Relic;
   relicOptions?: Relic[];
   lastStats?: EntityStats;
+  activeAltarEffect?: AltarEffect;
+  hasUsedAltarInLevel: boolean;
+  keyPath?: Position[];
 }
 
 export type StatChoice = 'Ataque' | 'Armadura' | 'Velocidade';

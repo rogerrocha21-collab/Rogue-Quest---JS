@@ -1,6 +1,6 @@
 
 import { MAP_WIDTH, MAP_HEIGHT, MAX_LEVELS, ENEMY_TYPES } from '../constants';
-import { TileType, Enemy, Chest, EntityStats, PotionEntity, ItemEntity, LevelTheme } from '../types';
+import { TileType, Enemy, Chest, EntityStats, PotionEntity, ItemEntity, LevelTheme, Position } from '../types';
 
 const THEMES: LevelTheme[] = ['FOREST', 'DESERT', 'SNOW', 'CAVE', 'MATRIX', 'INFERNO'];
 
@@ -47,6 +47,10 @@ export function generateDungeon(level: number) {
   const merchantRoom = rooms[Math.floor(Math.random() * (rooms.length - 2)) + 1];
   const merchantPos = { x: merchantRoom.x + merchantRoom.w - 2, y: merchantRoom.y + 1 };
 
+  // Altar (Random non-starting room)
+  const altarRoom = rooms[Math.floor(Math.random() * (rooms.length - 2)) + 1];
+  const altarPos = { x: altarRoom.x + 1, y: altarRoom.y + altarRoom.h - 2 };
+
   // Inimigos
   let enemiesPlaced = 0;
   const targetEnemies = 10 + Math.floor(Math.random() * 9); 
@@ -61,6 +65,7 @@ export function generateDungeon(level: number) {
     const isOverlappingVital = (ex === stairsPos.x && ey === stairsPos.y) ||
                                (ex === keyPos.x && ey === keyPos.y) ||
                                (ex === playerPos.x && ey === playerPos.y) ||
+                               (ex === altarPos.x && ey === altarPos.y) ||
                                (merchantPos && ex === merchantPos.x && ey === merchantPos.y);
     
     if (map[ey][ex] === 'FLOOR' && !isOverlappingVital && !enemies.some(e => e.x === ex && e.y === ey)) {
@@ -81,7 +86,7 @@ export function generateDungeon(level: number) {
     const room = rooms[Math.floor(Math.random() * (rooms.length - 1)) + 1];
     const cx = room.x + Math.floor(room.w/2);
     const cy = room.y + Math.floor(room.h/2);
-    if (!((cx === stairsPos.x && cy === stairsPos.y) || (cx === keyPos.x && cy === keyPos.y))) {
+    if (!((cx === stairsPos.x && cy === stairsPos.y) || (cx === keyPos.x && cy === keyPos.y) || (cx === altarPos.x && cy === altarPos.y))) {
         chests.push({ id: `c-${level}-${c}-${Math.random()}`, x: cx, y: cy });
     }
   }
@@ -90,13 +95,13 @@ export function generateDungeon(level: number) {
     if (idx > 0 && idx % 5 === 0) {
       const px = room.x + room.w - 1;
       const py = room.y + room.h - 1;
-      if (!((px === stairsPos.x && py === stairsPos.y) || (px === keyPos.x && py === keyPos.y))) {
+      if (!((px === stairsPos.x && py === stairsPos.y) || (px === keyPos.x && py === keyPos.y) || (px === altarPos.x && py === altarPos.y))) {
           potions.push({ id: `p-${level}-${idx}-${Math.random()}`, percent: 30, x: px, y: py });
       }
     }
   });
 
-  return { map, theme, playerPos, stairsPos, enemies, chests, potions, keyPos, merchantPos };
+  return { map, theme, playerPos, stairsPos, enemies, chests, potions, keyPos, merchantPos, altarPos };
 }
 
 function generateEnemyStats(level: number, isBoss: boolean): EntityStats {
@@ -106,4 +111,31 @@ function generateEnemyStats(level: number, isBoss: boolean): EntityStats {
   const arm = (4 + (level * 2)) * m;
   const spd = 10 + level;
   return { hp, maxHp: hp, attack: atk, armor: arm, maxArmor: arm, speed: spd };
+}
+
+export function findDungeonPath(start: Position, end: Position, map: TileType[][]): Position[] | null {
+  const queue: { pos: Position; path: Position[] }[] = [{ pos: start, path: [] }];
+  const visited = new Set<string>();
+  visited.add(`${start.x},${start.y}`);
+
+  while (queue.length > 0) {
+    const item = queue.shift();
+    if (!item) break;
+    const { pos, path } = item;
+    
+    if (pos.x === end.x && pos.y === end.y) return path;
+
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const nx = pos.x + dx;
+      const ny = pos.y + dy;
+      const key = `${nx},${ny}`;
+
+      if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT && 
+          map[ny] && map[ny][nx] !== 'WALL' && !visited.has(key)) {
+        visited.add(key);
+        queue.push({ pos: { x: nx, y: ny }, path: [...path, { x: nx, y: ny }] });
+      }
+    }
+  }
+  return null;
 }
