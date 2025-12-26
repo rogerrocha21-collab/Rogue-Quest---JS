@@ -28,8 +28,43 @@ const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, play
   const [effectTooltip, setEffectTooltip] = useState(false);
   const t = TRANSLATIONS[language];
 
+  const closeTooltips = () => {
+    setRelicTooltip(false);
+    setEffectTooltip(false);
+  };
+
   return (
-    <div className="flex flex-col gap-3 w-full">
+    <div className="flex flex-col gap-3 w-full relative">
+      {/* Tooltip Popup Centralizado (Relíquias) */}
+      {relicTooltip && activeRelic && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm" onClick={closeTooltips}>
+          <div className="bg-zinc-900 border-2 border-purple-500 p-6 rounded-[2rem] max-w-xs w-full shadow-[0_0_40px_rgba(168,85,247,0.3)] animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-center mb-4 text-purple-400">
+              {React.createElement((Icon as any)[activeRelic.icon], { width: 48, height: 48 })}
+            </div>
+            <h4 className="text-sm font-black text-purple-400 uppercase text-center mb-2 tracking-tighter">{activeRelic.name}</h4>
+            <p className="text-xs text-zinc-300 text-center leading-relaxed mb-6 font-mono">{activeRelic.description}</p>
+            <button onClick={closeTooltips} className="w-full py-3 bg-zinc-800 text-zinc-400 font-bold text-[10px] uppercase rounded-xl hover:text-white transition-colors tracking-widest border border-zinc-700">FECHAR</button>
+          </div>
+        </div>
+      )}
+
+      {/* Tooltip Popup Centralizado (Efeitos do Altar) */}
+      {effectTooltip && activeAltarEffect && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm" onClick={closeTooltips}>
+          <div className={`bg-zinc-900 border-2 p-6 rounded-[2rem] max-w-xs w-full shadow-2xl animate-in zoom-in-95 ${activeAltarEffect.type === 'BLESSING' ? 'border-yellow-500 shadow-yellow-500/20' : 'border-purple-600 shadow-purple-600/20'}`} onClick={e => e.stopPropagation()}>
+            <div className={`flex justify-center mb-4 ${activeAltarEffect.type === 'BLESSING' ? 'text-yellow-500' : 'text-purple-600'}`}>
+              <Icon.Altar width={48} height={48} />
+            </div>
+            <h4 className={`text-sm font-black uppercase text-center mb-2 tracking-tighter ${activeAltarEffect.type === 'BLESSING' ? 'text-yellow-500' : 'text-purple-400'}`}>
+              {t[activeAltarEffect.nameKey]}
+            </h4>
+            <p className="text-xs text-zinc-300 text-center leading-relaxed mb-6 font-mono">{t[activeAltarEffect.descKey]}</p>
+            <button onClick={closeTooltips} className="w-full py-3 bg-zinc-800 text-zinc-400 font-bold text-[10px] uppercase rounded-xl hover:text-white transition-colors tracking-widest border border-zinc-700">FECHAR</button>
+          </div>
+        </div>
+      )}
+
       {/* Container de Status Superior */}
       <div className="grid grid-cols-2 gap-2">
         {/* Lado Esquerdo: Nome, Pet e Ouro */}
@@ -76,35 +111,19 @@ const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, play
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
               {activeRelic && (
                 <div className="relative flex items-center">
-                  <button onClick={() => setRelicTooltip(!relicTooltip)} className="text-purple-400 animate-pulse flex-shrink-0">
+                  <button onClick={() => setRelicTooltip(true)} className="text-purple-400 animate-pulse flex-shrink-0">
                     {React.createElement((Icon as any)[activeRelic.icon], { width: 14, height: 14 })}
                   </button>
-                  {relicTooltip && (
-                    <div className="absolute bottom-full right-0 mb-2 w-48 bg-zinc-900 border border-purple-500/50 p-3 rounded-xl z-[100] shadow-2xl animate-in zoom-in-95">
-                      <p className="text-[10px] font-black text-purple-400 uppercase mb-1">{activeRelic.name}</p>
-                      <p className="text-[9px] text-zinc-400 leading-tight">{activeRelic.description}</p>
-                      <button onClick={() => setRelicTooltip(false)} className="mt-2 text-[8px] text-zinc-500 uppercase font-bold">FECHAR</button>
-                    </div>
-                  )}
                 </div>
               )}
               {activeAltarEffect && (
                 <div className="relative flex items-center">
                   <button 
-                    onClick={() => setEffectTooltip(!effectTooltip)} 
+                    onClick={() => setEffectTooltip(true)} 
                     className={`transition-transform hover:scale-110 flex-shrink-0 ${activeAltarEffect.type === 'BLESSING' ? 'text-yellow-500' : 'text-purple-600'}`}
                   >
                     <Icon.Altar width={14} height={14} />
                   </button>
-                  {effectTooltip && (
-                    <div className="absolute bottom-full right-0 mb-2 w-48 bg-zinc-900 border border-zinc-700 p-3 rounded-xl z-[100] shadow-2xl animate-in zoom-in-95">
-                      <p className={`text-[10px] font-black uppercase mb-1 ${activeAltarEffect.type === 'BLESSING' ? 'text-yellow-500' : 'text-purple-600'}`}>
-                        {t[activeAltarEffect.nameKey]}
-                      </p>
-                      <p className="text-[9px] text-zinc-400 leading-tight">{t[activeAltarEffect.descKey]}</p>
-                      <button onClick={() => setEffectTooltip(false)} className="mt-2 text-[8px] text-zinc-500 uppercase font-bold">FECHAR</button>
-                    </div>
-                  )}
                 </div>
               )}
               {!activeRelic && !activeAltarEffect && (

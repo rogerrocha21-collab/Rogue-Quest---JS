@@ -1,9 +1,9 @@
 
 import { LevelTheme, Language, Relic, AltarEffect } from './types';
 
-export const MAP_WIDTH = 45; 
-export const MAP_HEIGHT = 25;
-export const MAX_LEVELS = 15;
+export const MAP_WIDTH = 100; // Máximo para níveis letais
+export const MAP_HEIGHT = 60; // Máximo para níveis letais
+export const MAX_LEVELS = 150;
 
 export const INITIAL_PLAYER_STATS = {
   hp: 120,
@@ -129,7 +129,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     start_journey: "Iniciar Jornada",
     feedback: "Feedback",
     abyss: "O Abismo Infinito",
-    depth: "Profundidade",
+    depth: "ProfundIDADE",
     level: "Nível",
     hp: "VIDA",
     armor: "ESCUDO",
@@ -409,7 +409,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     theme_inferno: 'Zona Infernal',
     theme_ruins: 'Ruínas Antigas',
     theme_void: 'Abismo / Vacío',
-    theme_mechanical: 'Complejo Mecánico',
+    theme_mechanical: 'Complejo Mecânico',
     theme_corrupted: 'Zona Corrompida',
     theme_catacombs: 'Catacumbas Inundadas',
     theme_ossuary: 'Osario Maldito',
@@ -465,7 +465,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     c_hands_desc: "Probabilidad de fallar ataques.",
     c_breath_name: "Aliento Corto",
     c_breath_desc: "No puedes atacar en turnos consecutivos.",
-    c_mark_name: "Marca de la Presa",
+    c_mark_name: "Marca da Presa",
     c_mark_desc: "Los enemigos causan sangrado.",
     c_reflexes_name: "Reflejos Lentos",
     c_reflexes_desc: "Los enemigos siempre atacan primero.",

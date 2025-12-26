@@ -8,24 +8,42 @@ const BIOME_ORDER: LevelTheme[] = [
 ];
 
 export function generateDungeon(level: number) {
+  // Tamanhos de mapa baseados na progressão
+  let currentWidth = 25;
+  let currentHeight = 20;
+  let targetEnemies = 15;
+
+  if (level <= 30) {
+    currentWidth = 35; currentHeight = 25; targetEnemies = 15;
+  } else if (level <= 70) {
+    currentWidth = 50; currentHeight = 35; targetEnemies = 30;
+  } else if (level <= 120) {
+    currentWidth = 75; currentHeight = 45; targetEnemies = 45;
+  } else {
+    currentWidth = 90; currentHeight = 55; targetEnemies = 60;
+  }
+
   const map: TileType[][] = Array(MAP_HEIGHT).fill(0).map(() => Array(MAP_WIDTH).fill('WALL'));
   const rooms: {x: number, y: number, w: number, h: number}[] = [];
   
+  // Escolha do bioma baseada no nível (repetindo os 13 biomas ao longo dos 150 níveis)
   const biomeIndex = Math.min(Math.floor((level - 1) / 12), BIOME_ORDER.length - 1);
   const theme = BIOME_ORDER[biomeIndex];
   
+  // Layout variado
   let layoutType: 'rooms' | 'labyrinth' | 'open' = 'rooms';
   if (['MATRIX', 'MECHANICAL', 'CATACOMBS'].includes(theme)) layoutType = 'labyrinth';
   if (['ASTRAL', 'VOID', 'DESERT'].includes(theme)) layoutType = 'open';
 
+  // Gerar Salas ou Caminhos dentro dos limites atuais
   const numRoomsTarget = Math.min(8 + Math.floor(level / 12), 22);
 
   if (layoutType === 'rooms') {
     for (let i = 0; i < 250 && rooms.length < numRoomsTarget; i++) {
       const w = Math.floor(Math.random() * 5) + 3;
       const h = Math.floor(Math.random() * 5) + 3;
-      const x = Math.floor(Math.random() * (MAP_WIDTH - w - 2)) + 1;
-      const y = Math.floor(Math.random() * (MAP_HEIGHT - h - 2)) + 1;
+      const x = Math.floor(Math.random() * (currentWidth - w - 2)) + 1;
+      const y = Math.floor(Math.random() * (currentHeight - h - 2)) + 1;
       
       const overlap = rooms.some(r => x < r.x + r.w + 1 && x + w + 1 > r.x && y < r.y + r.h + 1 && y + h + 1 > r.y);
       if (!overlap) {
@@ -33,6 +51,7 @@ export function generateDungeon(level: number) {
         for (let ry = y; ry < y + h; ry++) for (let rx = x; rx < x + w; rx++) map[ry][rx] = 'FLOOR';
       }
     }
+    // Conectar salas
     for (let i = 0; i < rooms.length - 1; i++) {
       let currX = Math.floor(rooms[i].x + rooms[i].w / 2), currY = Math.floor(rooms[i].y + rooms[i].h / 2);
       const targetX = Math.floor(rooms[i+1].x + rooms[i+1].w / 2), targetY = Math.floor(rooms[i+1].y + rooms[i+1].h / 2);
@@ -40,23 +59,24 @@ export function generateDungeon(level: number) {
       while (currY !== targetY) { map[currY][currX] = 'FLOOR'; currY += currY < targetY ? 1 : -1; }
     }
   } else if (layoutType === 'labyrinth') {
-    for (let y = 1; y < MAP_HEIGHT - 1; y += 2) {
-      for (let x = 1; x < MAP_WIDTH - 1; x += 2) {
+    for (let y = 1; y < currentHeight - 1; y += 2) {
+      for (let x = 1; x < currentWidth - 1; x += 2) {
         map[y][x] = 'FLOOR';
-        if (x < MAP_WIDTH - 3 && Math.random() > 0.5) map[y][x + 1] = 'FLOOR';
-        if (y < MAP_HEIGHT - 3 && Math.random() > 0.5) map[y + 1][x] = 'FLOOR';
+        if (x < currentWidth - 3 && Math.random() > 0.5) map[y][x + 1] = 'FLOOR';
+        if (y < currentHeight - 3 && Math.random() > 0.5) map[y + 1][x] = 'FLOOR';
       }
     }
     rooms.push({x: 1, y: 1, w: 1, h: 1}); 
-    rooms.push({x: MAP_WIDTH - 2, y: MAP_HEIGHT - 2, w: 1, h: 1});
+    rooms.push({x: currentWidth - 2, y: currentHeight - 2, w: 1, h: 1});
   } else {
-    for (let y = 1; y < MAP_HEIGHT - 1; y++) {
-      for (let x = 1; x < MAP_WIDTH - 1; x++) {
+    // Open Space com obstáculos
+    for (let y = 1; y < currentHeight - 1; y++) {
+      for (let x = 1; x < currentWidth - 1; x++) {
         if (Math.random() > 0.12) map[y][x] = 'FLOOR';
       }
     }
     rooms.push({x: 2, y: 2, w: 1, h: 1});
-    rooms.push({x: MAP_WIDTH - 3, y: MAP_HEIGHT - 3, w: 1, h: 1});
+    rooms.push({x: currentWidth - 3, y: currentHeight - 3, w: 1, h: 1});
   }
 
   const playerPos = { x: rooms[0].x, y: rooms[0].y };
@@ -67,34 +87,17 @@ export function generateDungeon(level: number) {
   occupied.add(`${playerPos.x},${playerPos.y}`);
   occupied.add(`${stairsPos.x},${stairsPos.y}`);
 
-  const getFreeTile = () => {
-    for(let i=0; i<500; i++) {
-      const room = rooms[Math.floor(Math.random() * rooms.length)];
-      const rx = room.x + Math.floor(Math.random() * room.w);
-      const ry = room.y + Math.floor(Math.random() * room.h);
-      const key = `${rx},${ry}`;
-      if(!occupied.has(key)) {
-        occupied.add(key);
-        return {x: rx, y: ry};
-      }
-    }
-    return null;
-  };
+  // Chave
+  const keyRoom = rooms[Math.floor(Math.random() * (rooms.length - 1)) + 1];
+  const keyPos = { x: keyRoom.x, y: keyRoom.y };
+  occupied.add(`${keyPos.x},${keyPos.y}`);
 
-  const keyPos = getFreeTile() || { x: rooms[1].x, y: rooms[1].y };
-  const altarPos = getFreeTile() || { x: rooms[2].x, y: rooms[2].y };
-  
-  let merchantPos: Position | undefined;
-  if (level % 3 === 0 || level === 1) {
-    merchantPos = getFreeTile() || undefined;
-  }
-
+  // Inimigos
   const enemies: Enemy[] = [];
-  const targetEnemies = 15;
   let placedEnemies = 0;
   while (placedEnemies < targetEnemies) {
-    const rx = Math.floor(Math.random() * MAP_WIDTH);
-    const ry = Math.floor(Math.random() * MAP_HEIGHT);
+    const rx = Math.floor(Math.random() * currentWidth);
+    const ry = Math.floor(Math.random() * currentHeight);
     if (map[ry][rx] === 'FLOOR' && !occupied.has(`${rx},${ry}`)) {
       const types = ENEMY_TYPES.filter(t => t.minLevel <= level);
       const type = types[Math.floor(Math.random() * types.length)].name;
@@ -102,19 +105,38 @@ export function generateDungeon(level: number) {
         id: `e-${level}-${placedEnemies}`,
         x: rx, y: ry,
         type: type,
-        stats: generateEnemyStats(level, false),
-        isBoss: false
+        stats: generateEnemyStats(level, level > 120),
+        isBoss: level % 10 === 0 && placedEnemies === 0
       });
       occupied.add(`${rx},${ry}`);
       placedEnemies++;
     }
   }
 
+  // Baús
   const chests: Chest[] = [];
   const numChests = Math.random() > 0.7 ? 2 : 1;
   for(let i=0; i<numChests; i++) {
-    const pos = getFreeTile();
-    if(pos) chests.push({ id: `c-${level}-${i}`, x: pos.x, y: pos.y });
+    const chestRoom = rooms[Math.floor(Math.random() * rooms.length)];
+    const cx = chestRoom.x + Math.floor(Math.random() * chestRoom.w);
+    const cy = chestRoom.y + Math.floor(Math.random() * chestRoom.h);
+    if (!occupied.has(`${cx},${cy}`)) {
+      chests.push({ id: `c-${level}-${i}`, x: cx, y: cy });
+      occupied.add(`${cx},${cy}`);
+    }
+  }
+
+  // Altar e Mercador
+  let altarPos: Position | undefined;
+  if (Math.random() > 0.3) {
+    const altarRoom = rooms[Math.floor(Math.random() * rooms.length)];
+    altarPos = { x: altarRoom.x, y: altarRoom.y };
+  }
+
+  let merchantPos: Position | undefined;
+  if (level % 5 === 0) {
+    const mRoom = rooms[Math.floor(Math.random() * rooms.length)];
+    merchantPos = { x: mRoom.x, y: mRoom.y };
   }
 
   const potions: PotionEntity[] = [];
@@ -153,6 +175,7 @@ export function findDungeonPath(start: Position, end: Position, map: TileType[][
       const key = `${nx},${ny}`;
 
       if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT && map[ny][nx] !== 'WALL' && !visited.has(key)) {
+        // Ignorar inimigos para o cálculo se o destino for a própria chave/inimigo ou se for o caminho brilhante
         const hasEnemy = enemies.some(e => e.x === nx && e.y === ny);
         const isTarget = nx === end.x && ny === end.y;
 

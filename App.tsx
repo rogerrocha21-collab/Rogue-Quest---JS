@@ -162,20 +162,22 @@ const App: React.FC = () => {
         if (!prev || prev.gameStatus !== 'PLAYING' || moveQueue.length === 0) return prev;
 
         const { x, y } = nextPos;
+        
+        // Verifica se é um passo válido (adjacente ao playerPosRef atual)
         const dx = Math.abs(x - playerPosRef.current.x);
         const dy = Math.abs(y - playerPosRef.current.y);
-        
         if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) {
            setMoveQueue([]);
            return prev;
         }
 
+        // Colisão com parede
         if (prev.map[y][x] === 'WALL') {
           setMoveQueue([]);
           return prev;
         }
 
-        // Interações - A ORDEM IMPORTA
+        // Interações
         const enemy = prev.enemies.find(e => e.x === x && e.y === y);
         if (enemy) {
           setMoveQueue([]);
@@ -188,18 +190,17 @@ const App: React.FC = () => {
           return { ...prev, gameStatus: 'CHEST_OPEN' as const, chests: prev.chests.filter(c => c.id !== chest.id) };
         }
 
-        // Chave e poções só são processadas se não houver combate ou baú no mesmo tile
+        const potion = prev.potions.find(p => p.x === x && p.y === y);
+        if (potion) {
+          setMoveQueue([]);
+          return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) };
+        }
+
         if (prev.keyPos && x === prev.keyPos.x && y === prev.keyPos.y && !prev.hasKey) {
           playChime();
           setMoveQueue(q => q.slice(1));
           playerPosRef.current = nextPos;
           return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos };
-        }
-
-        const potion = prev.potions.find(p => p.x === x && p.y === y);
-        if (potion) {
-          setMoveQueue([]);
-          return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) };
         }
 
         if (prev.merchantPos && x === prev.merchantPos.x && y === prev.merchantPos.y) {
@@ -226,6 +227,7 @@ const App: React.FC = () => {
           }
         }
 
+        // Avança um passo na fila
         setMoveQueue(q => q.slice(1));
         playerPosRef.current = nextPos;
         return { ...prev, playerPos: nextPos, keyPath: prev.keyPath ? prev.keyPath.slice(1) : undefined };
@@ -338,7 +340,7 @@ const App: React.FC = () => {
                   onClick={() => window.open('https://t.me/c/2134721525/27', '_blank')}
                   className="w-full bg-zinc-900 border-2 border-zinc-700 text-zinc-400 rounded-2xl py-4 font-mono font-bold text-[10px] uppercase tracking-widest hover:text-white hover:border-zinc-500 hover:bg-zinc-800 transition-all shadow-lg active:scale-95"
                 >
-                  {t.feedback}
+                  Feedback
                 </button>
               </div>
               <div className="flex justify-center gap-8 pt-4 border-t border-zinc-900">
@@ -447,7 +449,13 @@ const App: React.FC = () => {
                 const effect = pool[Math.floor(Math.random() * pool.length)];
                 let playerStats = { ...prev.playerStats };
                 if (effect.id === 'anxious_strike') playerStats.attack = Math.floor(playerStats.attack * 2); 
-                return { ...prev, gameStatus: 'ALTAR_RESULT' as const, activeAltarEffect: effect, hasUsedAltarInLevel: true, playerStats };
+                
+                let keyPath;
+                if (effect.id === 'open_eyes' && prev.keyPos) {
+                    keyPath = findDungeonPath(prev.playerPos, prev.keyPos, prev.map, prev.enemies);
+                }
+
+                return { ...prev, gameStatus: 'ALTAR_RESULT' as const, activeAltarEffect: effect, hasUsedAltarInLevel: true, playerStats, keyPath };
               });
           }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } : null)} 
         />
