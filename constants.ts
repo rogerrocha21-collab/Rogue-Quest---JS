@@ -114,7 +114,14 @@ export const TRANSLATIONS: Record<Language, any> = {
     pet_coruja: "CORUJA",
     pet_cavalo: "CAVALO",
     buy_horse: "ALUGAR CAVALO",
-    descending: "Descendo para o nível"
+    descending: "Descendo para o nível",
+    log_entry: "entrou no abismo.",
+    log_depth: "Alcançou a profundidade",
+    log_key: "Chave coletada!",
+    log_locked: "Trancado. Precisa de Chave e Sangue!",
+    log_trampled: "Atropelado!",
+    next: "PRÓXIMO",
+    start: "COMEÇAR"
   },
   EN: {
     hero_placeholder: "HERO NAME",
@@ -169,7 +176,14 @@ export const TRANSLATIONS: Record<Language, any> = {
     pet_coruja: "OWL",
     pet_cavalo: "HORSE",
     buy_horse: "RENT HORSE",
-    descending: "Descending to level"
+    descending: "Descending to level",
+    log_entry: "entered the abyss.",
+    log_depth: "Reached depth",
+    log_key: "Key collected!",
+    log_locked: "Locked. Need Key & Blood!",
+    log_trampled: "Trampled!",
+    next: "NEXT",
+    start: "START"
   },
   ES: {
     hero_placeholder: "NOMBRE DEL HÉROE",
@@ -224,6 +238,13 @@ export const TRANSLATIONS: Record<Language, any> = {
     pet_coruja: "BÚHO",
     pet_cavalo: "CABALLO",
     buy_horse: "ALQUILAR CABALLO",
-    descending: "Descendiendo al nivel"
+    descending: "Descendiendo al nivel",
+    log_entry: "entró en el abismo.",
+    log_depth: "Alcanzó la profundidad",
+    log_key: "¡Llave recolectada!",
+    log_locked: "¡Cerrado. Necesitas Llave y Sangre!",
+    log_trampled: "¡Atropellado!",
+    next: "SIGUIENTE",
+    start: "EMPEZAR"
   }
 };

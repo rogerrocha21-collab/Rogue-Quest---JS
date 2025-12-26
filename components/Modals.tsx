@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Enemy, EntityStats, StatChoice, PotionEntity, ItemEntity, Pet, Language } from '../types';
 import { Icon } from './Icons';
@@ -232,6 +231,7 @@ export const ChestModal: React.FC<{onChoice: (choice: StatChoice) => void, langu
 
 export const TutorialModal: React.FC<{onFinish: () => void, language?: Language}> = ({ onFinish, language = 'PT' }) => {
   const [step, setStep] = useState(0);
+  const t = TRANSLATIONS[language];
   const slidesPT = [
     { title: "O ABISMO PROFUNDO", icon: <Icon.Stairs />, desc: "Bem-vindo, herói. Sua missão é desbravar as profundezas deste abismo infinito. Seu progresso é salvo automaticamente ao iniciar cada nível." },
     { title: "COMBATE E ATRIBUTOS", icon: <Icon.Sword />, desc: "As batalhas são automáticas. O mais rápido ataca primeiro. O ATAQUE define seu dano, a VELOCIDADE sua vez, e o ESCUDO absorve dano." },
@@ -255,7 +255,9 @@ export const TutorialModal: React.FC<{onFinish: () => void, language?: Language}
         <div className="w-20 h-20 bg-zinc-800 rounded-full flex items-center justify-center text-red-500 mb-6 border-2 border-zinc-700 animate-pulse">{current.icon}</div>
         <h2 className="text-xl font-black text-white mb-4 uppercase tracking-tighter">{current.title}</h2>
         <p className="text-zinc-400 text-xs leading-relaxed mb-10 h-24 flex items-center justify-center">{current.desc}</p>
-        <button onClick={() => step < slides.length - 1 ? setStep(step + 1) : onFinish()} className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl uppercase text-xs tracking-widest transition-all">{step < slides.length - 1 ? "NEXT" : "START"}</button>
+        <button onClick={() => step < slides.length - 1 ? setStep(step + 1) : onFinish()} className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl uppercase text-xs tracking-widest transition-all">
+          {step < slides.length - 1 ? t.next : t.start_journey}
+        </button>
       </div>
     </div>
   );

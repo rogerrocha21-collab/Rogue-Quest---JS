@@ -172,9 +172,16 @@ const App: React.FC = () => {
     const currentGold = gold ?? 0;
     const currentName = name || nameInput || 'Herói';
     const updatedPet = activePet ? { ...activePet, pos: { x: dungeon.playerPos.x - 1, y: dungeon.playerPos.y } } : undefined;
+    
+    // Pegando as traduções atuais para os logs iniciais
+    const currentT = TRANSLATIONS[currentLang];
+    const initialLog = level === 1 
+      ? `${currentName} ${currentT.log_entry}` 
+      : `${currentT.log_depth} ${level}.`;
+
     const newState: GameState = {
       ...dungeon, playerName: currentName, gold: currentGold, level, playerStats: currentStats,
-      hasKey: false, enemiesKilledInLevel: 0, gameStatus: 'PLAYING', logs: level === 1 ? [`${currentName} entered the abyss.`] : [`Reached depth ${level}.`],
+      hasKey: false, enemiesKilledInLevel: 0, gameStatus: 'PLAYING', logs: [initialLog],
       items: [], tronModeActive: false, tronTimeLeft: 0, tronTrail: [], activePet: updatedPet, language: currentLang
     };
     setGameState(newState);
@@ -205,13 +212,13 @@ const App: React.FC = () => {
               playerPos: { x: nx, y: ny }, 
               tronTrail: [...tronTrail, playerPos], 
               activePet: activePet ? { ...activePet, pos: playerPos } : undefined,
-              logs: [...gameState.logs, `Trampled! +${goldGain}G`]
+              logs: [...gameState.logs, `${t.log_trampled} +${goldGain}G`]
             });
             return;
         } else { setGameState({ ...gameState, gameStatus: 'COMBAT', currentEnemy: enemy }); return; }
     }
     if (keyPos && nx === keyPos.x && ny === keyPos.y && !hasKey) {
-        playChime(); setGameState({ ...gameState, hasKey: true, logs: [...gameState.logs, "Key collected!"], playerPos: { x: nx, y: ny }, activePet: activePet ? { ...activePet, pos: playerPos } : undefined }); return;
+        playChime(); setGameState({ ...gameState, hasKey: true, logs: [...gameState.logs, t.log_key], playerPos: { x: nx, y: ny }, activePet: activePet ? { ...activePet, pos: playerPos } : undefined }); return;
     }
     if (merchantPos && nx === merchantPos.x && ny === merchantPos.y) {
         setGameState({ ...gameState, gameStatus: 'MERCHANT_SHOP', playerPos: { x: nx, y: ny }, activePet: activePet ? { ...activePet, pos: playerPos } : undefined }); return;
@@ -226,7 +233,7 @@ const App: React.FC = () => {
         if (hasKey && enemiesKilledInLevel >= 1) {
             if (gameState.level >= MAX_LEVELS) setGameState({ ...gameState, gameStatus: 'WON' });
             else setGameState({ ...gameState, gameStatus: 'NEXT_LEVEL' });
-        } else { setGameState({ ...gameState, logs: [...gameState.logs, "Locked. Need Key & Blood!"], playerPos: { x: nx, y: ny } }); } return;
+        } else { setGameState({ ...gameState, logs: [...gameState.logs, t.log_locked], playerPos: { x: nx, y: ny } }); } return;
     }
     setGameState({ ...gameState, playerPos: { x: nx, y: ny }, tronTrail: tronModeActive ? [...tronTrail, playerPos] : tronTrail, activePet: activePet ? { ...activePet, pos: playerPos } : undefined });
   };
