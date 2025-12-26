@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState, useRef } from 'react';
-import { Enemy, EntityStats, StatChoice, PotionEntity, ItemEntity, Pet, Language } from '../types';
+import { Enemy, EntityStats, StatChoice, PotionEntity, ItemEntity, Pet, Language, Relic } from '../types';
 import { Icon } from './Icons';
-import { ITEM_POOL, TRANSLATIONS } from '../constants';
+import { ITEM_POOL, TRANSLATIONS, RELICS_POOL } from '../constants';
 
 interface CombatModalProps {
   playerStats: EntityStats;
@@ -41,7 +42,6 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
     const resolveTurn = () => {
       if (p.hp <= 0 || e.hp <= 0) { setIsDone(true); return; }
       const executeSequence = async () => {
-        // Turno do Pet (se houver)
         if (activePet && curPetHp > 0) {
             setLastAttacker('pet');
             setIsTakingDamage('enemy');
@@ -49,9 +49,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
             const petAtk = Math.max(1, Math.floor(p.attack / 2));
             e.hp -= petAtk;
             if (e.hp < 0) e.hp = 0;
-            
             addLog(`${t.combat_pet} ${t.combat_dealt} ${petAtk} ${t.combat_damage}`);
-            
             setCurrentEStats({ ...e });
             await new Promise(r => setTimeout(r, 400));
             setIsTakingDamage(null);
@@ -65,29 +63,23 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
             if (p.hp <= 0 || e.hp <= 0) return;
             let atkValue = side === 'player' ? p.attack : e.attack;
             let attackerName = side === 'player' ? t.combat_player : t.combat_enemy;
-            
             setLastAttacker(side);
             setIsTakingDamage(side === 'player' ? 'enemy' : 'player');
             if (onAttackSound) onAttackSound(side);
             setTimeout(() => setIsTakingDamage(null), 200);
-
             let defender = side === 'player' ? e : p;
             let originalAtk = atkValue;
             let absorbed = 0;
-
             if (defender.armor > 0) {
               absorbed = Math.min(defender.armor, originalAtk);
               defender.armor -= absorbed;
               atkValue -= absorbed;
             }
-
             if (atkValue > 0) defender.hp -= atkValue;
             if (defender.hp < 0) defender.hp = 0;
-
             let logMsg = `${attackerName} ${t.combat_dealt} ${originalAtk} ${t.combat_damage}`;
             if (absorbed > 0) logMsg += ` (${absorbed} ${t.combat_absorbed})`;
             addLog(logMsg);
-
             setCurrentPStats({ ...p }); 
             setCurrentEStats({ ...e }); 
         };
@@ -119,7 +111,6 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
             </div>
             <p className="text-[10px] text-zinc-500 font-bold uppercase">{t.hp}: <span className="text-white">{currentPStats.hp}</span> {t.armor}: <span className="text-blue-400">{currentPStats.armor}</span></p>
           </div>
-
           <div className={`text-center space-y-4 transition-all duration-200 ${lastAttacker === 'enemy' ? 'scale-110' : ''} ${isTakingDamage === 'enemy' ? 'animate-shake' : ''}`}>
             <div className={`p-6 rounded-2xl border-2 transition-colors ${enemy.isBoss ? 'bg-red-950 border-red-800' : isTakingDamage === 'enemy' ? 'bg-red-900/40 border-red-500' : 'bg-zinc-800 border-zinc-700'}`}>
               <span className={enemy.isBoss ? 'text-red-500' : 'text-zinc-300'}><Icon.Enemy isBoss={enemy.isBoss} /></span>
@@ -130,8 +121,6 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
             <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">{enemy.type}</p>
           </div>
         </div>
-
-        {/* Histórico de Batalha */}
         <div className="bg-black/50 border border-zinc-800 rounded-xl p-3 h-32 md:h-40 flex flex-col gap-1 overflow-hidden">
           <div ref={scrollRef} className="overflow-y-auto h-full pr-2 space-y-1 scroll-smooth">
             {combatLogs.map((log, i) => (
@@ -145,7 +134,6 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
             {combatLogs.length === 0 && <p className="text-[10px] text-zinc-600 animate-pulse text-center mt-8">{t.abyss.toUpperCase()}...</p>}
           </div>
         </div>
-
         {isDone && (
           <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 10) + 10, petHp)} className={`w-full font-black py-4 rounded-xl transition-all uppercase text-sm ${currentPStats.hp > 0 ? "bg-green-600 hover:bg-green-500 text-white shadow-[0_0_20px_rgba(22,163,74,0.4)]" : "bg-red-700 hover:bg-red-600 text-white shadow-[0_0_20px_rgba(185,28,28,0.4)]"}`}>
             {currentPStats.hp > 0 ? t.collect_reward : t.succumb}
@@ -156,7 +144,8 @@ export const CombatModal: React.FC<CombatModalProps> = ({ playerStats, enemy, ac
   );
 };
 
-export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: boolean, language?: Language, onBuyItem: (item: ItemEntity) => void, onBuyPotion: (pot: PotionEntity) => void, onRentTron: () => void, onBuyPet: (type: 'LOBO' | 'PUMA' | 'CORUJA') => void, onClose: () => void}> = ({ gold, level, hasPet, language = 'PT', onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose }) => {
+export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: boolean, language?: Language, onBuyItem: (item: ItemEntity) => void, onBuyPotion: (pot: PotionEntity, choice: 'use' | 'store') => void, onRentTron: () => void, onBuyPet: (type: 'LOBO' | 'PUMA' | 'CORUJA') => void, onClose: () => void}> = ({ gold, level, hasPet, language = 'PT', onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose }) => {
+  const [selectedPotion, setSelectedPotion] = useState<PotionEntity | null>(null);
   const potions = [{ id: 'p1', percent: 20, price: 10, x: 0, y: 0 }, { id: 'p2', percent: 40, price: 20, x: 0, y: 0 }, { id: 'p3', percent: 70, price: 35, x: 0, y: 0 }];
   const [offeredItems, setOfferedItems] = useState<ItemEntity[]>([]);
   const t = TRANSLATIONS[language];
@@ -165,6 +154,21 @@ export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: b
     const shuffled = [...ITEM_POOL].sort(() => 0.5 - Math.random());
     setOfferedItems(shuffled.slice(0, 4).map((item, idx) => ({ ...item, id: `item-${level}-${idx}`, price: Math.floor(item.basePrice * (1 + level * 0.05)), x: 0, y: 0 })) as ItemEntity[]);
   }, [level]);
+
+  if (selectedPotion) {
+    return (
+      <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] p-6 backdrop-blur-xl">
+        <div className="bg-zinc-900 border border-pink-500/30 p-8 rounded-3xl max-w-xs w-full text-center space-y-6">
+          <div className="text-pink-400 flex justify-center scale-150 mb-2"><Icon.Potion /></div>
+          <h3 className="text-white font-black uppercase text-sm">Poção de Cura (+{selectedPotion.percent}%)</h3>
+          <div className="flex flex-col gap-3">
+            <button onClick={() => { onBuyPotion(selectedPotion, 'use'); setSelectedPotion(null); }} className="bg-pink-600 py-3 rounded-xl text-white font-black text-xs uppercase">{t.use}</button>
+            <button onClick={() => { onBuyPotion(selectedPotion, 'store'); setSelectedPotion(null); }} className="bg-zinc-800 py-3 rounded-xl text-zinc-300 font-black text-xs uppercase">{t.store}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-6 backdrop-blur-xl">
@@ -182,17 +186,9 @@ export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: b
             <button disabled={gold < 12} onClick={() => onBuyPet('CORUJA')} className="flex flex-col items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-orange-500 transition-all disabled:opacity-50"><Icon.Owl /><span className="text-[10px] font-bold text-white mt-1 uppercase">{t.pet_coruja}</span><span className="text-[9px] text-yellow-500">12G</span></button>
           </div>
         )}
-        
-        {/* Nova Opção: Cavalo */}
-        <button 
-          disabled={gold < 25} 
-          onClick={onRentTron} 
-          className="w-full flex items-center justify-between p-4 bg-zinc-800 rounded-xl border border-cyan-500/30 hover:border-cyan-400 transition-all disabled:opacity-50"
-        >
+        <button disabled={gold < 25} onClick={onRentTron} className="w-full flex items-center justify-between p-4 bg-zinc-800 rounded-xl border border-cyan-500/30 hover:border-cyan-400 transition-all disabled:opacity-50">
           <div className="flex items-center gap-4">
-            <div className="p-2 bg-cyan-500/10 rounded-lg text-cyan-400 animate-pulse">
-              <Icon.Horse />
-            </div>
+            <div className="p-2 bg-cyan-500/10 rounded-lg text-cyan-400 animate-pulse"><Icon.Horse /></div>
             <div className="text-left">
               <p className="text-xs font-black text-white">{t.buy_horse}</p>
               <p className="text-[9px] text-zinc-500 uppercase">15s • {t.pet_cavalo}</p>
@@ -200,14 +196,56 @@ export const MerchantShopModal: React.FC<{gold: number, level: number, hasPet: b
           </div>
           <p className="text-xs font-bold text-yellow-500">25G</p>
         </button>
-
         <div className="grid grid-cols-3 gap-2">
-            {potions.map(p => (<button key={p.id} disabled={gold < p.price!} onClick={() => onBuyPotion(p)} className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 hover:border-pink-500 disabled:opacity-50 transition-colors"><div className="text-pink-500 mb-1 flex justify-center"><Icon.Potion /></div><div className="text-[9px] font-bold text-white text-center">+{p.percent}% {t.hp}</div><div className="text-[9px] text-yellow-500 font-bold text-center">{p.price}G</div></button>))}
+            {potions.map(p => (<button key={p.id} disabled={gold < p.price!} onClick={() => setSelectedPotion(p)} className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 hover:border-pink-500 disabled:opacity-50 transition-colors"><div className="text-pink-500 mb-1 flex justify-center"><Icon.Potion /></div><div className="text-[9px] font-bold text-white text-center">+{p.percent}% {t.hp}</div><div className="text-[9px] text-yellow-500 font-bold text-center">{p.price}G</div></button>))}
         </div>
         <div className="space-y-2">
             {offeredItems.map(i => (<button key={i.id} disabled={gold < i.price!} onClick={() => onBuyItem(i)} className="w-full flex justify-between items-center p-3 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-indigo-500 disabled:opacity-50 transition-colors"><div className="flex items-center gap-3"><span className="text-indigo-400">{i.iconType === 'sword' ? <Icon.Sword /> : i.iconType === 'shield' ? <Icon.Shield /> : i.iconType === 'heart' ? <Icon.Heart /> : <Icon.Boot />}</span><div className="text-left"><div className="text-[10px] font-bold text-white uppercase">{i.name}</div><div className="text-[8px] text-green-400">+{i.value} {(i.stat.replace('max', '')).toUpperCase()}</div></div></div><div className="text-[10px] font-bold text-yellow-500">{i.price}G</div></button>))}
         </div>
         <button onClick={onClose} className="w-full py-3 bg-zinc-100 text-black font-black rounded-xl uppercase text-[10px] tracking-widest">{t.close_deal}</button>
+      </div>
+    </div>
+  );
+};
+
+export const PotionPickupModal: React.FC<{potion: PotionEntity, language?: Language, onChoice: (choice: 'use' | 'store') => void}> = ({ potion, language = 'PT', onChoice }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] p-6 backdrop-blur-xl">
+      <div className="bg-zinc-900 border border-pink-500/40 p-10 rounded-[3rem] max-w-sm w-full text-center space-y-8 shadow-2xl">
+        <div className="text-pink-400 flex justify-center scale-[2] animate-bounce"><Icon.Potion /></div>
+        <div className="space-y-2">
+          <h3 className="text-white font-black uppercase text-base">Poção Encontrada!</h3>
+          <p className="text-zinc-500 text-xs font-bold">Restaura {potion.percent}% da vida máxima.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          <button onClick={() => onChoice('use')} className="bg-pink-600 hover:bg-pink-500 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest transition-all transform active:scale-95">{t.use}</button>
+          <button onClick={() => onChoice('store')} className="bg-zinc-800 hover:bg-zinc-700 py-4 rounded-2xl text-zinc-300 font-black text-sm uppercase tracking-widest transition-all transform active:scale-95">{t.store}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const RelicSelectionModal: React.FC<{options: Relic[], language?: Language, onSelect: (relic: Relic) => void}> = ({ options, language = 'PT', onSelect }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <div className="fixed inset-0 bg-black/98 flex items-center justify-center z-[110] p-6 backdrop-blur-2xl">
+      <div className="max-w-xl w-full text-center space-y-8">
+        <h2 className="text-3xl font-black text-purple-400 tracking-tighter uppercase italic drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]">{t.relic_choice}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {options.map(relic => (
+            <button key={relic.id} onClick={() => onSelect(relic)} className="group bg-zinc-900/50 border-2 border-zinc-800 hover:border-purple-500 p-6 rounded-[2rem] flex flex-col items-center gap-4 transition-all hover:scale-105 hover:bg-purple-950/10">
+              <div className="p-4 bg-zinc-800 rounded-2xl text-purple-400 group-hover:text-purple-300 transition-colors group-hover:animate-pulse">
+                {React.createElement((Icon as any)[relic.icon])}
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-black text-white uppercase tracking-tight">{relic.name}</p>
+                <p className="text-[10px] text-zinc-500 leading-tight h-10 flex items-center justify-center">{relic.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -232,22 +270,19 @@ export const ChestModal: React.FC<{onChoice: (choice: StatChoice) => void, langu
 export const TutorialModal: React.FC<{onFinish: () => void, language?: Language}> = ({ onFinish, language = 'PT' }) => {
   const [step, setStep] = useState(0);
   const t = TRANSLATIONS[language];
-  const slidesPT = [
-    { title: "O ABISMO PROFUNDO", icon: <Icon.Stairs />, desc: "Bem-vindo, herói. Sua missão é desbravar as profundezas deste abismo infinito. Seu progresso é salvo automaticamente ao iniciar cada nível." },
-    { title: "COMBATE E ATRIBUTOS", icon: <Icon.Sword />, desc: "As batalhas são automáticas. O mais rápido ataca primeiro. O ATAQUE define seu dano, a VELOCIDADE sua vez, e o ESCUDO absorve dano." },
-    { title: "CONDIÇÕES DE SAÍDA", icon: <Icon.Key />, desc: "A escada para o próximo nível está bloqueada! Para passar, você deve encontrar a CHAVE do abismo e provar sua força eliminando ao menos um inimigo." },
-  ];
-  const slidesEN = [
+  const slides = (language === 'EN' ? [
     { title: "THE DEEP ABYSS", icon: <Icon.Stairs />, desc: "Welcome, hero. Your mission is to explore the depths of this infinite abyss. Progress is automatically saved at the start of each level." },
     { title: "COMBAT & STATS", icon: <Icon.Sword />, desc: "Battles are automatic. The fastest attacks first. ATTACK defines your damage, SPEED your turn, and ARMOR absorbs damage." },
     { title: "EXIT CONDITIONS", icon: <Icon.Key />, desc: "The stairs to the next level are blocked! To pass, you must find the KEY and prove your strength by defeating at least one enemy." },
-  ];
-  const slidesES = [
+  ] : language === 'ES' ? [
     { title: "EL ABISMO PROFUNDO", icon: <Icon.Stairs />, desc: "Bienvenido, héroe. Tu misión es explorar las profundidades de este abismo infinito. El progreso se guarda automáticamente al inicio de cada nivel." },
     { title: "COMBATE Y ESTADÍSTICAS", icon: <Icon.Sword />, desc: "Las batallas son automáticas. El más rápido ataca primero. ATAQUE define tu daño, VELOCIDAD tu turno y ARMADURA absorbe daño." },
     { title: "CONDICIONES DE SALIDA", icon: <Icon.Key />, desc: "¡Las escaleras al siguiente nivel están bloqueadas! Debes encontrar la LLAVE y demostrar tu fuerza derrotando al menos a un enemigo." },
-  ];
-  const slides = language === 'EN' ? slidesEN : language === 'ES' ? slidesES : slidesPT;
+  ] : [
+    { title: "O ABISMO PROFUNDO", icon: <Icon.Stairs />, desc: "Bem-vindo, herói. Sua missão é desbravar as profundezas deste abismo infinito. Seu progresso é salvo automaticamente ao iniciar cada nível." },
+    { title: "COMBATE E ATRIBUTOS", icon: <Icon.Sword />, desc: "As batalhas são automáticas. O mais rápido ataca primeiro. O ATAQUE define seu dano, a VELOCIDADE sua vez, e o ESCUDO absorve dano." },
+    { title: "CONDIÇÕES DE SAÍDA", icon: <Icon.Key />, desc: "A escada para o próximo nível está bloqueada! Para passar, você deve encontrar a CHAVE do abismo e provar sua força eliminando ao menos um inimigo." },
+  ]);
   const current = slides[step];
   return (
     <div className="fixed inset-0 bg-black/98 flex items-center justify-center z-[100] p-6 backdrop-blur-xl">

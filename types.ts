@@ -43,6 +43,7 @@ export interface PotionEntity extends Position {
   id: string;
   percent: number;
   price?: number;
+  isSuper?: boolean;
 }
 
 export interface Pet {
@@ -51,6 +52,13 @@ export interface Pet {
   hp: number;
   maxHp: number;
   pos: Position;
+}
+
+export interface Relic {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
 }
 
 export interface GameState {
@@ -70,14 +78,20 @@ export interface GameState {
   hasKey: boolean;
   enemiesKilledInLevel: number;
   stairsPos: Position;
-  gameStatus: 'START_SCREEN' | 'TUTORIAL' | 'PLAYING' | 'COMBAT' | 'CHEST_OPEN' | 'MERCHANT_SHOP' | 'WON' | 'LOST' | 'NEXT_LEVEL';
+  gameStatus: 'START_SCREEN' | 'TUTORIAL' | 'PLAYING' | 'COMBAT' | 'CHEST_OPEN' | 'MERCHANT_SHOP' | 'WON' | 'LOST' | 'NEXT_LEVEL' | 'PICKUP_CHOICE' | 'RELIC_SELECTION';
   currentEnemy?: Enemy;
+  currentPotion?: PotionEntity;
   logs: string[];
   tronModeActive?: boolean;
   tronTimeLeft?: number;
   tronTrail?: Position[];
   activePet?: Pet;
   language?: Language;
+  inventory: PotionEntity[];
+  inventorySize: number;
+  activeRelic?: Relic;
+  relicOptions?: Relic[];
+  lastStats?: EntityStats;
 }
 
 export type StatChoice = 'Ataque' | 'Armadura' | 'Velocidade';

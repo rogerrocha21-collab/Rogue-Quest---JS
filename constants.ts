@@ -1,8 +1,9 @@
-import { LevelTheme, Language } from './types';
+
+import { LevelTheme, Language, Relic } from './types';
 
 export const MAP_WIDTH = 45; 
 export const MAP_HEIGHT = 25;
-export const MAX_LEVELS = 150;
+export const MAX_LEVELS = 15;
 
 export const INITIAL_PLAYER_STATS = {
   hp: 120,
@@ -12,6 +13,25 @@ export const INITIAL_PLAYER_STATS = {
   maxArmor: 8,
   speed: 12,
 };
+
+export const RELICS_POOL: Relic[] = [
+  { id: 'slots', name: '+5 Slots', description: '+5 slots no inventário', icon: 'Backpack' },
+  { id: 'bleed', name: 'Dente Serrilhado', description: '+1% de chance de causar sangramento permanente', icon: 'Droplets' },
+  { id: 'defense', name: 'Placa Rachada', description: 'Reduz em 1 o dano recebido (mínimo 1)', icon: 'ShieldAlert' },
+  { id: 'crit', name: 'Olho do Caçador', description: '+1% de chance de crítico', icon: 'Eye' },
+  { id: 'power', name: 'Punho Enrijecido', description: 'Primeiro ataque em cada andar causa +10% de dano', icon: 'Zap' },
+  { id: 'vamp', name: 'Ampulheta Carmesim', description: 'Recupera 15% de vida ao matar um inimigo (limitado por andar)', icon: 'Hourglass' },
+  { id: 'alch', name: 'Resíduo Alquímico', description: 'Poções curam +5% a mais', icon: 'FlaskConical' },
+  { id: 'save', name: 'Frasco Instável', description: '5% de chance de uma poção não ser consumida ao usar', icon: 'RefreshCcw' },
+  { id: 'memory', name: 'Memória Destilada', description: 'Primeira poção usada em cada run tem efeito dobrado', icon: 'Brain' },
+  { id: 'gaze', name: 'Gaze Antiga', description: 'Sempre começa a run com 1 poção que cura +70%', icon: 'Sparkles' },
+  { id: 'collar', name: 'Coleira de Ossos', description: 'Pets ganham +10 de dano base', icon: 'Skull' },
+  { id: 'bag', name: 'Bolsa Costurada', description: '+5% de ouro ganho', icon: 'Coins' },
+  { id: 'coin', name: 'Moeda Antiga', description: '5% de chance de inimigos droparem ouro extra', icon: 'CircleDollarSign' },
+  { id: 'heart', name: 'Coração Fissurado', description: '+10% dano, -5% HP máximo', icon: 'HeartOff' },
+  { id: 'mark', name: 'Marca do Sacrifício', description: 'Começa a run com -10% vida, mas +60 ouro', icon: 'Flame' },
+  { id: 'echo', name: 'Eco das Mortes', description: '20% de todos os atributos do personagem anterior é herdado', icon: 'Ghost' },
+];
 
 export const THEME_CONFIG: Record<LevelTheme, { nameKey: string, wall: string, floor: string, char: string, wallChar: string }> = {
   FOREST: { nameKey: 'theme_forest', wall: 'text-green-800', floor: 'text-green-950', char: '♣', wallChar: 'T' },
@@ -62,6 +82,12 @@ export const ITEM_POOL = [
 
 export const TRANSLATIONS: Record<Language, any> = {
   PT: {
+    inventory_title: "INVENTÁRIO",
+    inventory_full: "Inventário cheio!",
+    use: "USAR",
+    store: "GUARDAR",
+    relic_choice: "ESCOLHA UMA RELÍQUIA",
+    relic_active: "RELÍQUIA ATIVA",
     hero_placeholder: "NOME DO HERÓI",
     continue_journey: "Continuar Jornada",
     new_game: "Novo Jogo",
@@ -124,6 +150,12 @@ export const TRANSLATIONS: Record<Language, any> = {
     start: "COMEÇAR"
   },
   EN: {
+    inventory_title: "INVENTORY",
+    inventory_full: "Inventory full!",
+    use: "USE",
+    store: "STORE",
+    relic_choice: "CHOOSE A RELIC",
+    relic_active: "ACTIVE RELIC",
     hero_placeholder: "HERO NAME",
     continue_journey: "Continue Journey",
     new_game: "New Game",
@@ -186,6 +218,12 @@ export const TRANSLATIONS: Record<Language, any> = {
     start: "START"
   },
   ES: {
+    inventory_title: "INVENTARIO",
+    inventory_full: "¡Inventario lleno!",
+    use: "USAR",
+    store: "GUARDAR",
+    relic_choice: "ELIGE UNA RELIQUIA",
+    relic_active: "RELIQUIA ACTIVA",
     hero_placeholder: "NOMBRE DEL HÉROE",
     continue_journey: "Continuar Jornada",
     new_game: "Nuevo Juego",
@@ -229,7 +267,7 @@ export const TRANSLATIONS: Record<Language, any> = {
     key: "LLAVE",
     combat_dealt: "causó",
     combat_damage: "de daño",
-    combat_absorbed: "absorbió",
+    combat_absorbed: "absobrió",
     combat_player: "Tú",
     combat_enemy: "Enemigo",
     combat_pet: "Mascota",

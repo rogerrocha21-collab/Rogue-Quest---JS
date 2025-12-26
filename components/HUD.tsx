@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { EntityStats, Pet, Language } from '../types';
+import { EntityStats, Pet, Language, PotionEntity, Relic } from '../types';
 import { Icon } from './Icons';
 import { TRANSLATIONS } from '../constants';
 
@@ -14,10 +14,16 @@ interface HUDProps {
   playerName: string;
   activePet?: Pet;
   language?: Language;
+  inventory: PotionEntity[];
+  inventorySize: number;
+  activeRelic?: Relic;
+  onUsePotion: (idx: number) => void;
 }
 
-const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, playerName, activePet, language = 'PT' }) => {
+const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, playerName, activePet, language = 'PT', inventory, inventorySize, activeRelic, onUsePotion }) => {
   const [showLogs, setShowLogs] = useState(false);
+  const [showInventory, setShowInventory] = useState(false);
+  const [relicTooltip, setRelicTooltip] = useState(false);
   const t = TRANSLATIONS[language];
 
   return (
@@ -35,13 +41,27 @@ const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, play
               <span className="text-[10px] font-bold text-yellow-500">{gold}</span>
             </div>
           </div>
-          <div className="flex gap-4 border-t border-zinc-800 pt-2">
+          <div className="flex gap-4 border-t border-zinc-800 pt-2 items-center">
             <div className={`flex items-center gap-1.5 ${hasKey ? 'text-yellow-400' : 'text-zinc-700'}`}>
               <Icon.Key /><span className="text-[8px] font-bold uppercase">{hasKey ? t.key : '--'}</span>
             </div>
             <div className={`flex items-center gap-1.5 ${kills > 0 ? 'text-red-500' : 'text-zinc-700'}`}>
               <Icon.Enemy /><span className="text-[8px] font-bold uppercase">{kills > 0 ? t.blood : '--'}</span>
             </div>
+            {activeRelic && (
+              <div className="relative">
+                <button onClick={() => setRelicTooltip(!relicTooltip)} className="text-purple-400 animate-pulse transition-transform hover:scale-110">
+                  {React.createElement((Icon as any)[activeRelic.icon])}
+                </button>
+                {relicTooltip && (
+                  <div className="absolute bottom-full left-0 mb-2 w-48 bg-zinc-900 border border-purple-500/50 p-3 rounded-xl z-[100] shadow-2xl animate-in zoom-in-95">
+                    <p className="text-[10px] font-black text-purple-400 uppercase mb-1">{activeRelic.name}</p>
+                    <p className="text-[9px] text-zinc-400 leading-tight">{activeRelic.description}</p>
+                    <button onClick={(e) => { e.stopPropagation(); setRelicTooltip(false); }} className="mt-2 text-[8px] text-zinc-500 uppercase font-bold">FECHAR</button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -49,12 +69,17 @@ const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, play
         <div className="bg-zinc-900/80 border border-zinc-800 p-3 rounded-xl flex flex-col justify-between">
           <div className="flex justify-between items-center mb-1">
             <h3 className="text-zinc-500 uppercase text-[8px] font-bold tracking-widest text-center">{t.level.toUpperCase()} {level} / ?</h3>
-            {activePet && (
-              <div className="flex items-center gap-1 text-orange-400 animate-pulse">
-                {activePet.type === 'LOBO' ? <Icon.Wolf /> : activePet.type === 'PUMA' ? <Icon.Puma /> : <Icon.Owl />}
-                <span className="text-[8px] font-bold">{activePet.hp}/{activePet.maxHp}</span>
-              </div>
-            )}
+            <div className="flex gap-2 items-center">
+              {activePet && (
+                <div className="flex items-center gap-1 text-orange-400 animate-pulse">
+                  {activePet.type === 'LOBO' ? <Icon.Wolf /> : activePet.type === 'PUMA' ? <Icon.Puma /> : <Icon.Owl />}
+                  <span className="text-[8px] font-bold">{activePet.hp}/{activePet.maxHp}</span>
+                </div>
+              )}
+              <button onClick={() => setShowInventory(!showInventory)} className={`p-1.5 rounded-lg border transition-all ${showInventory ? 'bg-zinc-700 border-white text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'}`}>
+                <Icon.Backpack />
+              </button>
+            </div>
           </div>
           <button 
             onClick={() => setShowLogs(!showLogs)}
@@ -64,6 +89,30 @@ const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, play
           </button>
         </div>
       </div>
+
+      {/* Inventário Expandido */}
+      {showInventory && (
+        <div className="bg-zinc-900 border border-zinc-700 p-3 rounded-xl animate-in slide-in-from-top-2">
+          <div className="flex justify-between items-center mb-2 border-b border-zinc-800 pb-1">
+            <span className="text-[9px] font-black text-zinc-500 uppercase">{t.inventory_title}</span>
+            <span className="text-[9px] font-bold text-zinc-600">{inventory.length}/{inventorySize}</span>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {Array.from({ length: inventorySize }).map((_, i) => (
+              <div key={i} className={`h-10 border-2 rounded-lg flex items-center justify-center transition-all ${inventory[i] ? 'bg-pink-900/10 border-pink-500/30' : 'bg-black/40 border-zinc-800/50 border-dashed'}`}>
+                {inventory[i] ? (
+                  <button onClick={() => onUsePotion(i)} className="text-pink-400 hover:scale-110 active:scale-90 transition-transform flex flex-col items-center">
+                    <Icon.Potion />
+                    <span className="text-[7px] font-bold">+{inventory[i].percent}%</span>
+                  </button>
+                ) : (
+                  <span className="text-zinc-800 text-[10px]">{i + 1}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats e Barras */}
       <div className="bg-zinc-900/80 border border-zinc-800 p-3 rounded-xl">
