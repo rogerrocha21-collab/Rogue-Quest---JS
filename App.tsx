@@ -162,75 +162,75 @@ const App: React.FC = () => {
         if (!prev || prev.gameStatus !== 'PLAYING' || moveQueue.length === 0) return prev;
 
         const { x, y } = nextPos;
-        
-        // Verifica se é um passo válido (adjacente ao playerPosRef atual)
+        const oldPos = { ...prev.playerPos };
         const dx = Math.abs(x - playerPosRef.current.x);
         const dy = Math.abs(y - playerPosRef.current.y);
+        
         if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) {
            setMoveQueue([]);
            return prev;
         }
 
-        // Colisão com parede
         if (prev.map[y][x] === 'WALL') {
           setMoveQueue([]);
           return prev;
         }
 
-        // Interações
+        const updatedPet = prev.activePet ? { ...prev.activePet, pos: oldPos } : undefined;
+
+        // PRIORIDADE DE INTERAÇÃO
         const enemy = prev.enemies.find(e => e.x === x && e.y === y);
         if (enemy) {
           setMoveQueue([]);
-          return { ...prev, gameStatus: 'COMBAT' as const, currentEnemy: enemy };
+          return { ...prev, gameStatus: 'COMBAT' as const, currentEnemy: enemy } as GameState;
         }
 
         const chest = prev.chests.find(c => c.x === x && c.y === y);
         if (chest) {
           setMoveQueue([]);
-          return { ...prev, gameStatus: 'CHEST_OPEN' as const, chests: prev.chests.filter(c => c.id !== chest.id) };
-        }
-
-        const potion = prev.potions.find(p => p.x === x && p.y === y);
-        if (potion) {
-          setMoveQueue([]);
-          return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) };
+          return { ...prev, gameStatus: 'CHEST_OPEN' as const, chests: prev.chests.filter(c => c.id !== chest.id) } as GameState;
         }
 
         if (prev.keyPos && x === prev.keyPos.x && y === prev.keyPos.y && !prev.hasKey) {
           playChime();
           setMoveQueue(q => q.slice(1));
           playerPosRef.current = nextPos;
-          return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos };
+          return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos, activePet: updatedPet } as GameState;
+        }
+
+        const potion = prev.potions.find(p => p.x === x && p.y === y);
+        if (potion) {
+          setMoveQueue([]);
+          return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) } as GameState;
         }
 
         if (prev.merchantPos && x === prev.merchantPos.x && y === prev.merchantPos.y) {
           setMoveQueue([]);
           playerPosRef.current = nextPos;
-          return { ...prev, gameStatus: 'MERCHANT_SHOP' as const, playerPos: nextPos };
+          return { ...prev, gameStatus: 'MERCHANT_SHOP' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
         }
 
         if (prev.altarPos && x === prev.altarPos.x && y === prev.altarPos.y) {
           setMoveQueue([]);
           playerPosRef.current = nextPos;
-          return { ...prev, gameStatus: 'ALTAR_INTERACTION' as const, playerPos: nextPos };
+          return { ...prev, gameStatus: 'ALTAR_INTERACTION' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
         }
 
         if (x === prev.stairsPos.x && y === prev.stairsPos.y) {
           if (prev.hasKey && prev.enemiesKilledInLevel > 0) {
             playChime();
             setMoveQueue([]);
-            return { ...prev, gameStatus: 'NEXT_LEVEL' as const };
+            return { ...prev, gameStatus: 'NEXT_LEVEL' as const } as GameState;
           } else {
             setMoveQueue(q => q.slice(1));
             playerPosRef.current = nextPos;
-            return { ...prev, logs: [...prev.logs, t.log_locked], playerPos: nextPos };
+            return { ...prev, logs: [...prev.logs, t.log_locked], playerPos: nextPos, activePet: updatedPet } as GameState;
           }
         }
 
-        // Avança um passo na fila
         setMoveQueue(q => q.slice(1));
         playerPosRef.current = nextPos;
-        return { ...prev, playerPos: nextPos, keyPath: prev.keyPath ? prev.keyPath.slice(1) : undefined };
+        return { ...prev, playerPos: nextPos, activePet: updatedPet, keyPath: prev.keyPath ? prev.keyPath.slice(1) : undefined } as GameState;
       });
     }, 100);
 
@@ -239,14 +239,7 @@ const App: React.FC = () => {
 
   const handleTileClick = (tx: number, ty: number) => {
     if (!gameState || gameState.gameStatus !== 'PLAYING') return;
-    
-    const path = findDungeonPath(
-      playerPosRef.current, 
-      { x: tx, y: ty }, 
-      gameState.map, 
-      gameState.enemies
-    );
-
+    const path = findDungeonPath(playerPosRef.current, { x: tx, y: ty }, gameState.map, gameState.enemies);
     if (path && path.length > 0) {
       setMoveQueue(path);
       setGameState(prev => prev ? { ...prev, keyPath: path } : null);
@@ -263,16 +256,17 @@ const App: React.FC = () => {
       const updatedPet = prev.activePet ? { ...prev.activePet, hp: petHp || 0 } : undefined;
       let finalGoldEarned = goldEarned;
       if (prev.activeAltarEffect?.id === 'sacred_greed') finalGoldEarned = Math.floor(finalGoldEarned * 1.5);
+      if (prev.activeAltarEffect?.id === 'cursed_greed') finalGoldEarned = Math.floor(finalGoldEarned * 0.5);
       
-      let finalGoldTotal = prev.gold + finalGoldEarned;
       let nextStats = { ...newStats };
       if (prev.activeAltarEffect?.id === 'surrendered_blood') nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.3));
+      if (prev.activeAltarEffect?.id === 'blood_tribute' && finalGoldEarned > 0) nextStats.hp = Math.max(1, nextStats.hp - 5);
 
       playCoinSound();
       const updated: GameState = {
         ...prev, 
         playerStats: nextStats, 
-        gold: finalGoldTotal, 
+        gold: prev.gold + finalGoldEarned, 
         gameStatus: 'PLAYING' as const,
         enemies: prev.enemies.filter(e => e.id !== prev.currentEnemy?.id),
         enemiesKilledInLevel: prev.enemiesKilledInLevel + 1,
@@ -290,6 +284,12 @@ const App: React.FC = () => {
     let used = false;
     setGameState(prev => {
       if (!prev || !prev.inventory[idx]) return prev;
+      if (prev.activeAltarEffect?.id === 'denied_offering') {
+        const newInv = [...prev.inventory];
+        newInv.splice(idx, 1);
+        used = true;
+        return { ...prev, activeAltarEffect: undefined, inventory: newInv };
+      }
       const pot = prev.inventory[idx];
       const stats = { ...prev.playerStats };
       let boost = pot.percent;
@@ -297,9 +297,9 @@ const App: React.FC = () => {
       const heal = Math.floor(stats.maxHp * (boost / 100));
       stats.hp = Math.min(stats.maxHp, stats.hp + heal);
       const newInv = [...prev.inventory];
-      newInv.splice(idx, 1);
+      if (prev.activeAltarEffect?.id !== 'accepted_offering') newInv.splice(idx, 1);
       used = true;
-      return { ...prev, playerStats: stats, inventory: newInv };
+      return { ...prev, playerStats: stats, inventory: newInv, activeAltarEffect: prev.activeAltarEffect?.id === 'accepted_offering' ? undefined : prev.activeAltarEffect };
     });
     return used;
   };
@@ -336,12 +336,7 @@ const App: React.FC = () => {
                     <button onClick={() => { if(!nameInput.trim()) return; startMusic(); initLevel(1, undefined, 0, nameInput); }} disabled={!nameInput.trim()} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95 disabled:opacity-30 disabled:grayscale">{t.start_journey}</button>
                   </div>
                 )}
-                <button 
-                  onClick={() => window.open('https://t.me/c/2134721525/27', '_blank')}
-                  className="w-full bg-zinc-900 border-2 border-zinc-700 text-zinc-400 rounded-2xl py-4 font-mono font-bold text-[10px] uppercase tracking-widest hover:text-white hover:border-zinc-500 hover:bg-zinc-800 transition-all shadow-lg active:scale-95"
-                >
-                  Feedback
-                </button>
+                <button onClick={() => window.open('https://t.me/c/2134721525/27', '_blank')} className="w-full bg-zinc-900 border-2 border-zinc-700 text-zinc-400 rounded-2xl py-4 font-mono font-bold text-[10px] uppercase tracking-widest hover:text-white hover:border-zinc-500 hover:bg-zinc-800 transition-all shadow-lg active:scale-95">Feedback</button>
               </div>
               <div className="flex justify-center gap-8 pt-4 border-t border-zinc-900">
                 <button onClick={() => setCurrentLang('PT')} className="relative flex flex-col items-center group"><div className={`transition-transform hover:scale-110 ${currentLang === 'PT' ? 'opacity-100 scale-110' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-80'}`}><Icon.FlagBR /></div></button>
@@ -361,12 +356,8 @@ const App: React.FC = () => {
               <p className="text-[9px] font-mono text-zinc-500 font-bold uppercase tracking-[0.2em] mt-1">{t[THEME_CONFIG[gameState.theme].nameKey]} – {t.level} {gameState.level}</p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => window.open('https://t.me/ComunidadeRQ', '_blank')} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
-                <Icon.Users />
-              </button>
-              <button onClick={handleShare} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
-                <Icon.Share />
-              </button>
+              <button onClick={() => window.open('https://t.me/ComunidadeRQ', '_blank')} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors"><Icon.Users /></button>
+              <button onClick={handleShare} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors"><Icon.Share /></button>
               <button onClick={() => setIsMuted(!isMuted)} className={`w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center transition-colors ${isMuted ? 'text-zinc-600' : 'text-red-800'}`}>{isMuted ? <Icon.VolumeX /> : <Icon.Volume2 />}</button>
             </div>
           </header>
@@ -395,20 +386,21 @@ const App: React.FC = () => {
             if (choice === 'Ataque') stats.attack += 5 * multiplier;
             if (choice === 'Armadura') { stats.maxArmor += 3 * multiplier; stats.armor += 3 * multiplier; }
             if (choice === 'Velocidade') stats.speed += 4 * multiplier;
-            return { ...prev, playerStats: stats, gameStatus: 'PLAYING' as const, activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect };
+            return { ...prev, playerStats: stats, gameStatus: 'PLAYING' as const, activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect } as GameState;
           });
       }} language={currentLang} doubleBonus={gameState.activeAltarEffect?.id === 'consecrated_chest'} />}
       
       {gameState.gameStatus === 'MERCHANT_SHOP' && (
         <MerchantShopModal 
           gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} language={currentLang}
+          discount={gameState.activeAltarEffect?.id === 'merchant_blessing'}
           onBuyItem={(item) => {
               setGameState(prev => {
                 if(!prev) return prev;
                 const stats = { ...prev.playerStats };
                 stats[item.stat as keyof EntityStats] += item.value;
                 if(item.stat === 'maxArmor') stats.armor += item.value;
-                return { ...prev, gold: prev.gold - item.price!, playerStats: stats };
+                return { ...prev, gold: prev.gold - item.price!, playerStats: stats } as GameState;
               });
           }}
           onBuyPotion={(pot, choice) => {
@@ -418,23 +410,23 @@ const App: React.FC = () => {
                  const stats = { ...prev.playerStats };
                  const heal = Math.floor(stats.maxHp * (pot.percent / 100));
                  stats.hp = Math.min(stats.maxHp, stats.hp + heal);
-                 return { ...prev, gold: prev.gold - pot.price!, playerStats: stats };
+                 return { ...prev, gold: prev.gold - pot.price!, playerStats: stats } as GameState;
                });
              } else {
                setGameState(prev => {
                  if(!prev) return prev;
-                 return { ...prev, gold: prev.gold - pot.price!, inventory: [...prev.inventory, pot] };
+                 return { ...prev, gold: prev.gold - pot.price!, inventory: [...prev.inventory, pot] } as GameState;
                });
              }
           }}
           onRentTron={() => {
-              setGameState(prev => prev ? { ...prev, gold: prev.gold - 25, tronModeActive: true, tronTimeLeft: 15, gameStatus: 'PLAYING' as const } : null);
+              setGameState(prev => prev ? { ...prev, gold: prev.gold - 25, tronModeActive: true, tronTimeLeft: 15, gameStatus: 'PLAYING' as const } as GameState : null);
           }}
           onBuyPet={(type) => {
              const pet: Pet = { type, name: type, hp: 50, maxHp: 50, pos: { ...playerPosRef.current } };
-             setGameState(prev => prev ? { ...prev, gold: prev.gold - (type === 'CORUJA' ? 12 : 10), activePet: pet } : null);
+             setGameState(prev => prev ? { ...prev, gold: prev.gold - (type === 'CORUJA' ? 12 : 10), activePet: pet } as GameState : null);
           }}
-          onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } : null)}
+          onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)}
         />
       )}
 
@@ -450,18 +442,30 @@ const App: React.FC = () => {
                 let playerStats = { ...prev.playerStats };
                 if (effect.id === 'anxious_strike') playerStats.attack = Math.floor(playerStats.attack * 2); 
                 
-                let keyPath;
+                let keyPath: Position[] | undefined = undefined;
                 if (effect.id === 'open_eyes' && prev.keyPos) {
-                    keyPath = findDungeonPath(prev.playerPos, prev.keyPos, prev.map, prev.enemies);
+                    const path = findDungeonPath(prev.playerPos, prev.keyPos, prev.map, prev.enemies);
+                    if (path) keyPath = path;
                 }
 
-                return { ...prev, gameStatus: 'ALTAR_RESULT' as const, activeAltarEffect: effect, hasUsedAltarInLevel: true, playerStats, keyPath };
+                let inventorySize = prev.inventorySize;
+                if (effect.id === 'less_weight') inventorySize = Math.max(1, inventorySize - 2);
+
+                return { 
+                    ...prev, 
+                    gameStatus: 'ALTAR_RESULT' as const, 
+                    activeAltarEffect: effect, 
+                    hasUsedAltarInLevel: true, 
+                    playerStats, 
+                    keyPath,
+                    inventorySize
+                } as GameState;
               });
-          }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } : null)} 
+          }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)} 
         />
       )}
       {gameState.gameStatus === 'ALTAR_RESULT' && gameState.activeAltarEffect && (
-        <AltarResultModal effect={gameState.activeAltarEffect} language={currentLang} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } : null)} />
+        <AltarResultModal effect={gameState.activeAltarEffect} language={currentLang} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)} />
       )}
       
       {gameState.gameStatus === 'WON' && (
