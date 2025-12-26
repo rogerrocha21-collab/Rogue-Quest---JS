@@ -8,97 +8,85 @@ const BIOME_ORDER: LevelTheme[] = [
 ];
 
 export function generateDungeon(level: number) {
-  let currentWidth = 30;
-  let currentHeight = 25;
+  let currentWidth = 35;
+  let currentHeight = 30;
   let targetEnemies = 15;
 
   if (level <= 30) {
-    currentWidth = 35; currentHeight = 25; targetEnemies = 15;
+    currentWidth = 40; currentHeight = 35; targetEnemies = 15;
   } else if (level <= 70) {
-    currentWidth = 50; currentHeight = 35; targetEnemies = 30;
+    currentWidth = 55; currentHeight = 45; targetEnemies = 30;
   } else if (level <= 120) {
-    currentWidth = 75; currentHeight = 45; targetEnemies = 45;
+    currentWidth = 75; currentHeight = 55; targetEnemies = 45;
   } else {
-    currentWidth = 90; currentHeight = 55; targetEnemies = 60;
+    currentWidth = 95; currentHeight = 58; targetEnemies = 60;
   }
 
   const map: TileType[][] = Array(MAP_HEIGHT).fill(0).map(() => Array(MAP_WIDTH).fill('WALL'));
-  const rooms: {x: number, y: number, w: number, h: number}[] = [];
   
   const biomeIdx = Math.floor((level - 1) / 12) % BIOME_ORDER.length;
   const theme = BIOME_ORDER[biomeIdx];
-  
-  let layoutType: 'rooms' | 'labyrinth' | 'open' = 'rooms';
-  if (['MATRIX', 'MECHANICAL', 'CATACOMBS'].includes(theme)) layoutType = 'labyrinth';
-  if (['ASTRAL', 'VOID', 'DESERT'].includes(theme)) layoutType = 'open';
 
-  const numRoomsTarget = Math.min(6 + Math.floor(level / 8), 20);
+  // Algoritmo de Labirinto Procedural (Caminhada do Bêbado / Drunkard's Walk + Escavação)
+  const excavateLabyrinth = (startX: number, startY: number, steps: number) => {
+    let cx = startX;
+    let cy = startY;
+    for (let i = 0; i < steps; i++) {
+      map[cy][cx] = 'FLOOR';
+      const dir = Math.floor(Math.random() * 4);
+      if (dir === 0 && cx < currentWidth - 3) cx++;
+      else if (dir === 1 && cx > 2) cx--;
+      else if (dir === 2 && cy < currentHeight - 3) cy++;
+      else if (dir === 3 && cy > 2) cy--;
+    }
+  };
 
-  // Escavar áreas andáveis
-  if (layoutType === 'rooms') {
-    for (let i = 0; i < 400 && rooms.length < numRoomsTarget; i++) {
-      const w = Math.floor(Math.random() * 6) + 5;
-      const h = Math.floor(Math.random() * 6) + 5;
-      const x = Math.floor(Math.random() * (currentWidth - w - 4)) + 2;
-      const y = Math.floor(Math.random() * (currentHeight - h - 4)) + 2;
-      
-      const overlap = rooms.some(r => x < r.x + r.w + 2 && x + w + 2 > r.x && y < r.y + r.h + 2 && y + h + 2 > r.y);
-      if (!overlap) {
-        rooms.push({x, y, w, h});
-        for (let ry = y; ry < y + h; ry++) for (let rx = x; rx < x + w; rx++) map[ry][rx] = 'FLOOR';
-      }
-    }
-    // Corredores
-    for (let i = 0; i < rooms.length - 1; i++) {
-      let currX = Math.floor(rooms[i].x + rooms[i].w / 2), currY = Math.floor(rooms[i].y + rooms[i].h / 2);
-      const targetX = Math.floor(rooms[i+1].x + rooms[i+1].w / 2), targetY = Math.floor(rooms[i+1].y + rooms[i+1].h / 2);
-      while (currX !== targetX) { map[currY][currX] = 'FLOOR'; currX += currX < targetX ? 1 : -1; }
-      while (currY !== targetY) { map[currY][currX] = 'FLOOR'; currY += currY < targetY ? 1 : -1; }
-    }
-  } else if (layoutType === 'labyrinth') {
-    for (let y = 2; y < currentHeight - 2; y += 2) {
-      for (let x = 2; x < currentWidth - 2; x += 2) {
+  // Múltiplos túneis para garantir densidade de labirinto
+  const iterations = Math.min(15 + Math.floor(level / 5), 40);
+  for (let i = 0; i < iterations; i++) {
+    const rx = Math.floor(Math.random() * (currentWidth - 6)) + 3;
+    const ry = Math.floor(Math.random() * (currentHeight - 6)) + 3;
+    excavateLabyrinth(rx, ry, 150 + Math.floor(level * 2));
+  }
+
+  // Garantir conectividade com salas pequenas ocasionais
+  const numMiniRooms = 5 + Math.floor(level / 10);
+  for (let i = 0; i < numMiniRooms; i++) {
+    const rw = Math.floor(Math.random() * 3) + 3;
+    const rh = Math.floor(Math.random() * 3) + 3;
+    const rx = Math.floor(Math.random() * (currentWidth - rw - 4)) + 2;
+    const ry = Math.floor(Math.random() * (currentHeight - rh - 4)) + 2;
+    for (let y = ry; y < ry + rh; y++) {
+      for (let x = rx; x < rx + rw; x++) {
         map[y][x] = 'FLOOR';
-        if (Math.random() > 0.4) map[y][x + 1] = 'FLOOR';
-        if (Math.random() > 0.4) map[y + 1][x] = 'FLOOR';
       }
     }
-    rooms.push({x: 2, y: 2, w: 1, h: 1});
-  } else {
-    for (let y = 2; y < currentHeight - 2; y++) {
-      for (let x = 2; x < currentWidth - 2; x++) {
-        if (Math.random() > 0.15) map[y][x] = 'FLOOR';
-      }
-    }
-    rooms.push({x: 3, y: 3, w: 1, h: 1});
   }
 
   const occupied = new Set<string>();
   const getFreeTile = () => {
-    for(let i=0; i<2000; i++) {
+    // Procura por um tile de chão que não esteja ocupado
+    for (let i = 0; i < 3000; i++) {
       const rx = Math.floor(Math.random() * (currentWidth - 4)) + 2;
       const ry = Math.floor(Math.random() * (currentHeight - 4)) + 2;
       if (map[ry][rx] === 'FLOOR' && !occupied.has(`${rx},${ry}`)) {
         occupied.add(`${rx},${ry}`);
-        return {x: rx, y: ry};
+        return { x: rx, y: ry };
       }
     }
-    // Fallback: procura exaustivamente o primeiro tile de chão
-    for(let y=0; y<currentHeight; y++) {
-      for(let x=0; x<currentWidth; x++) {
-        if(map[y][x] === 'FLOOR' && !occupied.has(`${x},${y}`)) {
-           occupied.add(`${x},${y}`);
-           return {x, y};
-        }
-      }
-    }
-    return {x: 5, y: 5}; // Último caso
+    // Fallback: Força a criação de um tile de chão se necessário
+    const fx = Math.floor(Math.random() * (currentWidth - 6)) + 3;
+    const fy = Math.floor(Math.random() * (currentHeight - 6)) + 3;
+    map[fy][fx] = 'FLOOR';
+    occupied.add(`${fx},${fy}`);
+    return { x: fx, y: fy };
   };
 
   const playerPos = getFreeTile();
   const stairsPos = getFreeTile();
   const keyPos = getFreeTile();
   
+  // Inimigos
   const enemies: Enemy[] = [];
   for (let i = 0; i < targetEnemies; i++) {
     const pos = getFreeTile();
@@ -113,17 +101,31 @@ export function generateDungeon(level: number) {
     });
   }
 
+  // Baús
   const chests: Chest[] = [];
   const numChests = Math.random() > 0.6 ? 2 : 1;
-  for(let i=0; i<numChests; i++) {
+  for (let i = 0; i < numChests; i++) {
     const pos = getFreeTile();
     chests.push({ id: `c-${level}-${i}`, x: pos.x, y: pos.y });
+  }
+
+  // Poções espalhadas (2 a 3 por nível como solicitado)
+  const potions: PotionEntity[] = [];
+  const numPotions = Math.floor(Math.random() * 2) + 2; // 2 ou 3
+  for (let i = 0; i < numPotions; i++) {
+    const pos = getFreeTile();
+    potions.push({
+      id: `p-${level}-${i}`,
+      x: pos.x,
+      y: pos.y,
+      percent: Math.random() > 0.8 ? 50 : 25
+    });
   }
 
   let altarPos = getFreeTile();
   let merchantPos = (level % 5 === 0 || level === 1) ? getFreeTile() : undefined;
 
-  return { map, theme, playerPos, stairsPos, enemies, chests, potions: [], keyPos, merchantPos, altarPos };
+  return { map, theme, playerPos, stairsPos, enemies, chests, potions, keyPos, merchantPos, altarPos };
 }
 
 function generateEnemyStats(level: number, isElite: boolean): EntityStats {
@@ -150,6 +152,7 @@ export function findDungeonPath(start: Position, end: Position, map: TileType[][
       const nx = pos.x + dx;
       const ny = pos.y + dy;
       const key = `${nx},${ny}`;
+      // Importante: verificar se nx e ny estão dentro dos limites e se é FLOOR
       if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT && map[ny][nx] === 'FLOOR' && !visited.has(key)) {
         const hasEnemy = enemies.some(e => e.x === nx && e.y === ny);
         if (!hasEnemy || (nx === end.x && ny === end.y)) {

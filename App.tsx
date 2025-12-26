@@ -162,9 +162,6 @@ const App: React.FC = () => {
         const nextPos = moveQueue[0];
         const oldPos = { ...prev.playerPos };
         
-        // Remove a verificação de adjacência rigorosa para evitar travas de sync
-        // Confiamos no findDungeonPath que já gera passos adjacentes
-        
         const updatedPet = prev.activePet ? { ...prev.activePet, pos: oldPos } : undefined;
 
         // PRIORIDADE DE INTERAÇÃO NO TILE DE DESTINO
@@ -224,16 +221,13 @@ const App: React.FC = () => {
       });
     };
 
-    const timer = setTimeout(moveStep, 80); // Velocidade de movimento levemente aumentada
+    const timer = setTimeout(moveStep, 80); 
     return () => clearTimeout(timer);
   }, [moveQueue, gameState?.gameStatus, t]);
 
   const handleTileClick = (tx: number, ty: number) => {
     if (!gameState || gameState.gameStatus !== 'PLAYING') return;
-    
-    // Calcula o caminho a partir da posição ATUAL real do jogador (ref)
     const path = findDungeonPath(playerPosRef.current, { x: tx, y: ty }, gameState.map, gameState.enemies);
-    
     if (path && path.length > 0) {
       setMoveQueue(path);
       setGameState(prev => prev ? { ...prev, keyPath: path } : null);
@@ -245,7 +239,7 @@ const App: React.FC = () => {
   const onCombatFinish = (newStats: EntityStats, win: boolean, goldEarned: number, petHp?: number) => {
     setGameState(prev => {
       if (!prev) return prev;
-      if (!win) return { ...prev, gameStatus: 'LOST' as const, lastStats: prev.playerStats };
+      if (!win) return { ...prev, gameStatus: 'LOST' as const, lastStats: { ...prev.playerStats, hp: 0 } };
       
       const updatedPet = prev.activePet ? { ...prev.activePet, hp: petHp || 0 } : undefined;
       let finalGoldEarned = goldEarned;
@@ -366,7 +360,6 @@ const App: React.FC = () => {
             ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'} keyPath={gameState.keyPath} onTileClick={handleTileClick}
           />
 
-          {/* Fix: use gameState.playerName instead of non-existent playerName variable */}
           <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory}/>
         </div>
       )}
@@ -475,17 +468,91 @@ const App: React.FC = () => {
         </div>
       )}
       
+      {/* TELA DE MORTE ATUALIZADA COM ESTATÍSTICAS FINAIS */}
       {gameState.gameStatus === 'LOST' && (
-        <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in">
-          <div className="text-center space-y-2"><h2 className="text-6xl font-black text-red-600 tracking-tighter uppercase">{t.death_title}</h2><p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">{t.death_desc}</p></div>
-          <button onClick={() => { localStorage.removeItem('rq_save_v150_final'); window.location.reload(); }} className="w-full py-5 bg-red-800 text-white font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-red-700 transition-all">{t.rebirth}</button>
+        <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-6 space-y-6 animate-in fade-in overflow-y-auto">
+          <div className="text-center space-y-2">
+            <h2 className="text-6xl font-black text-red-600 tracking-tighter uppercase drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">
+              {t.death_title}
+            </h2>
+            <p className="text-zinc-500 font-bold text-[10px] uppercase tracking-[0.3em]">
+              {t.death_desc}
+            </p>
+          </div>
+
+          <div className="w-full max-w-md bg-zinc-900/50 border border-zinc-800 rounded-[2.5rem] p-8 space-y-6 shadow-2xl backdrop-blur-md">
+            <h3 className="text-center text-xs font-black text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-4">
+              {t.final_stats}
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-black/40 p-4 rounded-2xl border border-zinc-800/50 flex flex-col items-center gap-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase">{t.level}</span>
+                <span className="text-xl font-black text-white">{gameState.level}</span>
+              </div>
+              <div className="bg-black/40 p-4 rounded-2xl border border-zinc-800/50 flex flex-col items-center gap-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase">{t.hp}</span>
+                <span className="text-xl font-black text-red-500">{gameState.lastStats?.maxHp || 0}</span>
+              </div>
+              <div className="bg-black/40 p-4 rounded-2xl border border-zinc-800/50 flex flex-col items-center gap-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase">{t.atk}</span>
+                <span className="text-xl font-black text-yellow-500">{gameState.lastStats?.attack || 0}</span>
+              </div>
+              <div className="bg-black/40 p-4 rounded-2xl border border-zinc-800/50 flex flex-col items-center gap-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase">{t.armor}</span>
+                <span className="text-xl font-black text-blue-500">{gameState.lastStats?.maxArmor || 0}</span>
+              </div>
+              <div className="bg-black/40 p-4 rounded-2xl border border-zinc-800/50 flex flex-col items-center gap-1 col-span-2">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase">{t.vel}</span>
+                <span className="text-xl font-black text-green-500">{gameState.lastStats?.speed || 0}</span>
+              </div>
+            </div>
+
+            {gameState.activeRelic && (
+              <div className="bg-purple-950/10 border border-purple-500/20 p-4 rounded-2xl flex items-center gap-4">
+                <div className="text-purple-400">
+                  {React.createElement((Icon as any)[gameState.activeRelic.icon], { width: 24, height: 24 })}
+                </div>
+                <div className="text-left">
+                  <p className="text-[8px] font-black text-purple-500 uppercase tracking-widest">{t.relic_active}</p>
+                  <p className="text-xs font-black text-white uppercase">{gameState.activeRelic.name}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={handleShare} 
+                className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-black rounded-xl uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all border border-zinc-700"
+              >
+                <Icon.Share width={14} height={14} /> COMPARTILHAR CONQUISTA
+              </button>
+              <button 
+                onClick={() => { localStorage.removeItem('rq_save_v150_final'); window.location.reload(); }} 
+                className="w-full py-5 bg-red-800 text-white font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-red-700 transition-all shadow-[0_0_20px_rgba(185,28,28,0.3)]"
+              >
+                {t.rebirth}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
+      {/* TELA DE PRÓXIMO NÍVEL */}
       {gameState.gameStatus === 'NEXT_LEVEL' && (
         <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in">
-          <div className="text-center space-y-2"><h2 className="text-5xl font-black text-white tracking-tighter uppercase">{t.victory}</h2><p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">{t.descending} {gameState.level + 1}</p></div>
-          <button onClick={() => initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, gameState.activeRelic, gameState.inventory)} className="w-full py-5 bg-zinc-100 text-black font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-white transition-all">{t.next}</button>
+          <div className="text-center space-y-4">
+            <h2 className="text-4xl font-black text-red-600 tracking-tighter uppercase animate-pulse">
+              Descendo para o próximo nível...
+            </h2>
+            <p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">Alcançando profundidade {gameState.level + 1}</p>
+          </div>
+          <button 
+            onClick={() => initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, gameState.activeRelic, gameState.inventory)} 
+            className="w-full max-w-xs py-5 bg-white text-black font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+          >
+            Prosseguir
+          </button>
         </div>
       )}
 
