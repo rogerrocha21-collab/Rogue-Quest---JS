@@ -25,7 +25,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('rq_save_mobile_v2');
+      const saved = localStorage.getItem('rq_save_v150_final');
       if (saved) {
         const data = JSON.parse(saved);
         setGameState({ ...data, gameStatus: 'START_SCREEN' });
@@ -43,18 +43,15 @@ const App: React.FC = () => {
         setIsNewGameMode(true);
       }
     } catch (e) {
-      console.error("Erro ao carregar save:", e);
-      localStorage.removeItem('rq_save_mobile_v2');
+      localStorage.removeItem('rq_save_v150_final');
       window.location.reload();
     }
   }, []);
 
   const saveGame = useCallback((state: GameState) => {
     try {
-      localStorage.setItem('rq_save_mobile_v2', JSON.stringify({ ...state, language: currentLang }));
-    } catch (e) {
-      console.warn("Não foi possível salvar o jogo automaticamente.");
-    }
+      localStorage.setItem('rq_save_v150_final', JSON.stringify({ ...state, language: currentLang }));
+    } catch (e) {}
   }, [currentLang]);
 
   const t = TRANSLATIONS[currentLang];
@@ -118,21 +115,9 @@ const App: React.FC = () => {
     let currentGold = gold ?? 0;
     let invSize = 5;
 
-    if (activeRelic?.id === 'mark') { currentGold += 60; currentStats.hp = Math.floor(currentStats.hp * 0.9); }
-    if (activeRelic?.id === 'heart') { currentStats.attack = Math.floor(currentStats.attack * 1.1); currentStats.maxHp = Math.floor(currentStats.maxHp * 0.9); currentStats.hp = Math.min(currentStats.hp, currentStats.maxHp); }
     if (activeRelic?.id === 'slots') invSize = 10;
-    if (activeRelic?.id === 'echo' && gameState?.lastStats) {
-        currentStats.attack += Math.floor(gameState.lastStats.attack * 0.2);
-        currentStats.maxHp += Math.floor(gameState.lastStats.maxHp * 0.2);
-        currentStats.hp += Math.floor(gameState.lastStats.maxHp * 0.2);
-        currentStats.speed += Math.floor(gameState.lastStats.speed * 0.2);
-        currentStats.maxArmor += Math.floor(gameState.lastStats.maxArmor * 0.2);
-        currentStats.armor += Math.floor(gameState.lastStats.maxArmor * 0.2);
-    }
-
+    
     const startInv = inventory || [];
-    if (activeRelic?.id === 'gaze') startInv.push({ id: 'relic-pot', percent: 70, isSuper: true, x: 0, y: 0 });
-
     const finalPlayerName = name || nameInput;
 
     const newState: GameState = {
@@ -145,13 +130,12 @@ const App: React.FC = () => {
       hasKey: false,
       enemiesKilledInLevel: 0,
       gameStatus: (level === 1 && !stats) ? 'TUTORIAL' : 'PLAYING',
-      logs: (level === 1 && !stats) ? [`${finalPlayerName} ${TRANSLATIONS[currentLang].log_entry}`] : [`${TRANSLATIONS[currentLang].descending} ${level}`],
+      logs: (level === 1 && !stats) ? [`${finalPlayerName} entrou no abismo.`] : [`Descendo para o nível ${level}`],
       inventory: startInv,
       inventorySize: invSize,
       activePet,
       activeRelic,
       language: currentLang,
-      lastStats: gameState?.lastStats,
       hasUsedAltarInLevel: false,
       activeAltarEffect: undefined,
       keyPath: undefined
@@ -160,12 +144,7 @@ const App: React.FC = () => {
     setGameState(newState);
     saveGame(newState); 
     setMoveQueue([]);
-  }, [nameInput, currentLang, gameState?.lastStats, saveGame]);
-
-  const findPath = (start: Position, end: Position): Position[] | null => {
-    if (!gameState || !gameState.map || gameState.map.length === 0) return null;
-    return findDungeonPath(start, end, gameState.map);
-  };
+  }, [nameInput, currentLang, saveGame]);
 
   const handleMove = useCallback((dx: number, dy: number) => {
     setGameState(prev => {
@@ -198,7 +177,7 @@ const App: React.FC = () => {
 
       if (prev.keyPos && nx === prev.keyPos.x && ny === prev.keyPos.y && !prev.hasKey) {
         playChime();
-        return { ...prev, hasKey: true, logs: [...prev.logs, TRANSLATIONS[currentLang].log_key], playerPos: { x: nx, y: ny }, keyPath: [] };
+        return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: { x: nx, y: ny } };
       }
 
       if (prev.merchantPos && nx === prev.merchantPos.x && ny === prev.merchantPos.y) {
@@ -217,46 +196,20 @@ const App: React.FC = () => {
           playChime();
           return { ...prev, gameStatus: 'NEXT_LEVEL' };
         } else {
-          return { ...prev, logs: [...prev.logs, TRANSLATIONS[currentLang].log_locked], playerPos: { x: nx, y: ny } };
+          return { ...prev, logs: [...prev.logs, t.log_locked], playerPos: { x: nx, y: ny } };
         }
       }
 
       const newPos = { x: nx, y: ny };
-      let newTrail = prev.tronTrail || [];
-      if (prev.tronModeActive) {
-        newTrail = [...newTrail, prev.playerPos];
-      }
-
-      let newPet = prev.activePet;
-      if (newPet) {
-        newPet = { ...newPet, pos: prev.playerPos };
-      }
-
-      return { ...prev, playerPos: newPos, tronTrail: newTrail, activePet: newPet };
+      return { ...prev, playerPos: newPos };
     });
-  }, [currentLang]);
+  }, [currentLang, t]);
 
   useEffect(() => {
     if (gameState?.gameStatus === 'NEXT_LEVEL') {
-      initLevel(
-        gameState.level + 1,
-        gameState.playerStats,
-        gameState.gold,
-        gameState.playerName,
-        gameState.activePet,
-        gameState.activeRelic,
-        gameState.inventory
-      );
+      initLevel(gameState!.level + 1, gameState!.playerStats, gameState!.gold, gameState!.playerName, gameState!.activePet, gameState!.activeRelic, gameState!.inventory);
     }
-  }, [gameState?.gameStatus, gameState?.level, initLevel]);
-
-  const handleTileClick = (tx: number, ty: number) => {
-    if (!gameState || gameState.gameStatus !== 'PLAYING') return;
-    const path = findPath(gameState.playerPos, { x: tx, y: ty });
-    if (path && path.length > 0) {
-      setMoveQueue(path);
-    }
-  };
+  }, [gameState?.gameStatus, initLevel]);
 
   useEffect(() => {
     if (moveQueue.length > 0 && gameState?.gameStatus === 'PLAYING') {
@@ -266,31 +219,35 @@ const App: React.FC = () => {
           setMoveQueue([]);
           return;
         }
-        const dx = next.x - gameState.playerPos.x;
-        const dy = next.y - gameState.playerPos.y;
-        
+
+        const dx = next.x - gameState!.playerPos.x;
+        const dy = next.y - gameState!.playerPos.y;
+
         if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && (Math.abs(dx) + Math.abs(dy) > 0)) {
            handleMove(dx, dy);
            setMoveQueue(prev => prev.slice(1));
         } else {
            setMoveQueue([]);
         }
-      }, 80);
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [moveQueue, gameState?.playerPos, gameState?.gameStatus, handleMove]);
 
-  useEffect(() => {
-    const handleKeydown = (e: KeyboardEvent) => {
-      if (gameState?.gameStatus !== 'PLAYING') return;
-      if (['ArrowUp', 'w', 'W'].includes(e.key)) { setMoveQueue([]); handleMove(0, -1); }
-      if (['ArrowDown', 's', 'S'].includes(e.key)) { setMoveQueue([]); handleMove(0, 1); }
-      if (['ArrowLeft', 'a', 'A'].includes(e.key)) { setMoveQueue([]); handleMove(-1, 0); }
-      if (['ArrowRight', 'd', 'D'].includes(e.key)) { setMoveQueue([]); handleMove(1, 0); }
-    };
-    window.addEventListener('keydown', handleKeydown);
-    return () => window.removeEventListener('keydown', handleKeydown);
-  }, [gameState?.gameStatus, handleMove]);
+  const handleTileClick = (tx: number, ty: number) => {
+    if (!gameState || gameState.gameStatus !== 'PLAYING') return;
+    
+    const path = findDungeonPath(
+      gameState.playerPos, 
+      { x: tx, y: ty }, 
+      gameState.map, 
+      gameState.enemies
+    );
+
+    if (path && path.length > 0) {
+      setMoveQueue(path);
+    }
+  };
 
   const onCombatFinish = (newStats: EntityStats, win: boolean, goldEarned: number, petHp?: number) => {
     setGameState(prev => {
@@ -298,84 +255,22 @@ const App: React.FC = () => {
       if (!win) return { ...prev, gameStatus: 'LOST', lastStats: prev.playerStats };
       
       const updatedPet = prev.activePet ? { ...prev.activePet, hp: petHp || 0 } : undefined;
-      
       let finalGoldEarned = goldEarned;
       if (prev.activeAltarEffect?.id === 'sacred_greed') finalGoldEarned = Math.floor(finalGoldEarned * 1.5);
-      if (prev.activeAltarEffect?.id === 'cursed_greed') finalGoldEarned = Math.floor(finalGoldEarned * 0.5);
-
-      let finalGoldTotal = prev.gold + finalGoldEarned;
-      if (prev.activeRelic?.id === 'bag') finalGoldTotal += Math.floor(finalGoldEarned * 0.05);
-      if (prev.activeRelic?.id === 'coin' && Math.random() < 0.05) finalGoldTotal += 10;
       
+      let finalGoldTotal = prev.gold + finalGoldEarned;
       let nextStats = { ...newStats };
-      if (prev.activeRelic?.id === 'vamp') {
-        nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.15));
-      }
-
-      if (prev.activeAltarEffect?.id === 'surrendered_blood') {
-        nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.3));
-      }
+      if (prev.activeAltarEffect?.id === 'surrendered_blood') nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.3));
 
       playCoinSound();
-      return {
-        ...prev,
-        playerStats: nextStats,
-        gold: finalGoldTotal,
-        gameStatus: 'PLAYING',
+      const updated = {
+        ...prev, playerStats: nextStats, gold: finalGoldTotal, gameStatus: 'PLAYING',
         enemies: prev.enemies.filter(e => e.id !== prev.currentEnemy?.id),
         enemiesKilledInLevel: prev.enemiesKilledInLevel + 1,
-        activePet: updatedPet,
-        currentEnemy: undefined
+        activePet: updatedPet, currentEnemy: undefined
       };
-    });
-  };
-
-  const onChestChoice = (choice: StatChoice) => {
-    setGameState(prev => {
-      if (!prev) return prev;
-      const stats = { ...prev.playerStats };
-      
-      let multiplier = 1;
-      let clearConsecrated = false;
-      if (prev.activeAltarEffect?.id === 'consecrated_chest') {
-          multiplier = 2;
-          clearConsecrated = true;
-      }
-
-      if (choice === 'Ataque') stats.attack += 5 * multiplier;
-      if (choice === 'Armadura') { stats.maxArmor += 3 * multiplier; stats.armor += 3 * multiplier; }
-      if (choice === 'Velocidade') stats.speed += 4 * multiplier;
-
-      return { 
-          ...prev, 
-          playerStats: stats, 
-          gameStatus: 'PLAYING',
-          activeAltarEffect: clearConsecrated ? undefined : prev.activeAltarEffect
-      };
-    });
-  };
-
-  const onPotionPickup = (choice: 'use' | 'store') => {
-    setGameState(prev => {
-      if (!prev || !prev.currentPotion) return prev;
-      if (choice === 'use') {
-        const stats = { ...prev.playerStats };
-        let potency = prev.currentPotion.percent;
-        
-        if (prev.activeAltarEffect?.id === 'profane_thirst') potency -= 10;
-
-        const heal = Math.floor(stats.maxHp * (potency / 100));
-        stats.hp = Math.min(stats.maxHp, stats.hp + heal);
-        return { ...prev, playerStats: stats, gameStatus: 'PLAYING', currentPotion: undefined };
-      } else {
-        const currentCap = prev.activeAltarEffect?.id === 'less_weight' ? prev.inventorySize - 2 : prev.inventorySize;
-        if (prev.inventory.length < currentCap) {
-          return { ...prev, inventory: [...prev.inventory, prev.currentPotion], gameStatus: 'PLAYING', currentPotion: undefined };
-        } else {
-          alert(TRANSLATIONS[currentLang].inventory_full);
-          return prev;
-        }
-      }
+      saveGame(updated);
+      return updated;
     });
   };
 
@@ -383,97 +278,21 @@ const App: React.FC = () => {
     let used = false;
     setGameState(prev => {
       if (!prev || !prev.inventory[idx]) return prev;
-      
-      if (prev.activeAltarEffect?.id === 'denied_offering') {
-          const newInv = [...prev.inventory];
-          newInv.splice(idx, 1);
-          used = true;
-          return { ...prev, inventory: newInv, activeAltarEffect: undefined, logs: [...prev.logs, "Sua oferta foi negada! A poção quebrou."] };
-      }
-
       const pot = prev.inventory[idx];
       const stats = { ...prev.playerStats };
       let boost = pot.percent;
-      if (prev.activeRelic?.id === 'alch') boost += 5;
       if (prev.activeAltarEffect?.id === 'profane_thirst') boost -= 10;
-
       const heal = Math.floor(stats.maxHp * (boost / 100));
       stats.hp = Math.min(stats.maxHp, stats.hp + heal);
-      
       const newInv = [...prev.inventory];
-      let clearAccepted = false;
-      if (prev.activeAltarEffect?.id === 'accepted_offering') {
-          clearAccepted = true;
-      } else {
-        if (prev.activeRelic?.id !== 'save' || Math.random() > 0.05) {
-            newInv.splice(idx, 1);
-        }
-      }
-
+      newInv.splice(idx, 1);
       used = true;
-      return { 
-          ...prev, 
-          playerStats: stats, 
-          inventory: newInv, 
-          activeAltarEffect: clearAccepted ? undefined : prev.activeAltarEffect 
-      };
+      return { ...prev, playerStats: stats, inventory: newInv };
     });
     return used;
   };
 
-  const onAltarPray = () => {
-      setGameState(prev => {
-          if (!prev) return prev;
-          
-          const isLucky = Math.random() > 0.4; 
-          const pool = isLucky ? BLESSINGS_POOL : CURSES_POOL;
-          const effect = pool[Math.floor(Math.random() * pool.length)];
-          
-          let logs = [...prev.logs, `${t[effect.nameKey]}: ${t[effect.descKey]}`];
-          let keyPath = prev.keyPath;
-          let playerStats = { ...prev.playerStats };
-
-          if (effect.id === 'open_eyes' && prev.keyPos) {
-              const path = findDungeonPath(prev.playerPos, prev.keyPos, prev.map);
-              if (path) keyPath = path;
-          }
-
-          if (effect.id === 'anxious_strike') {
-              playerStats.attack = Math.floor(playerStats.attack * 2); 
-          }
-
-          return { 
-              ...prev, 
-              gameStatus: 'ALTAR_RESULT',
-              activeAltarEffect: effect, 
-              hasUsedAltarInLevel: true, 
-              logs, 
-              keyPath,
-              playerStats
-          };
-      });
-  };
-
-  const onRelicSelect = (relic: Relic) => {
-    if (!gameState) return;
-    initLevel(1, undefined, 0, gameState.playerName, undefined, relic, []);
-  };
-
-  const handleContinue = () => {
-    if (!gameState) return;
-    startMusic();
-    setGameState({ ...gameState, gameStatus: 'PLAYING' });
-  };
-
-  const handleStartNew = () => {
-    if (!nameInput.trim()) return;
-    startMusic();
-    initLevel(1, undefined, 0, nameInput);
-  };
-
-  if (!gameState) return <div className="bg-black min-h-screen" />;
-
-  const hasSave = gameState.map && gameState.map.length > 0;
+  if (!gameState) return null;
 
   return (
     <div className="bg-black min-h-screen text-zinc-300 font-sans selection:bg-red-500/30 overflow-x-hidden">
@@ -482,37 +301,40 @@ const App: React.FC = () => {
           <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in-95 duration-700">
             <div className="space-y-2 mb-12">
               <h1 className="text-6xl md:text-7xl font-sans font-black tracking-tighter flex items-center justify-center">
-                <span className="text-white">ROGUE</span>
-                <span className="text-red-800">QUEST</span>
+                <span className="text-white">ROGUE</span><span className="text-red-800">QUEST</span>
               </h1>
               <p className="text-zinc-500 font-mono text-[10px] tracking-[0.8em] font-bold uppercase mt-2 pl-[0.8em]">O ABISMO INFINITO</p>
             </div>
             
             <div className="bg-[#0f0f0f] border border-zinc-800 rounded-[2.5rem] p-10 space-y-8 shadow-2xl">
               <div className="space-y-6">
-                {hasSave && !isNewGameMode ? (
+                {!isNewGameMode && gameState.playerName ? (
                   <div className="space-y-4">
                     <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
                       <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Herói Ativo</p>
                       <p className="text-sm font-black text-white">{gameState.playerName}</p>
                       <p className="text-[10px] font-bold text-red-800 uppercase">Profundidade: {gameState.level}</p>
                     </div>
-                    <button onClick={handleContinue} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95">{t.continue_journey}</button>
+                    <button onClick={() => { startMusic(); setGameState({ ...gameState, gameStatus: 'PLAYING' }); }} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95">{t.continue_journey}</button>
                     <button onClick={() => setIsNewGameMode(true)} className="w-full bg-[#1e1e1e] hover:bg-[#2a2a2a] py-5 rounded-2xl text-zinc-500 font-mono font-bold text-[10px] uppercase tracking-widest transition-all">{t.new_game}</button>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     <div className="relative group"><input type="text" maxLength={12} placeholder={t.hero_placeholder} value={nameInput} onChange={e => setNameInput(e.target.value.toUpperCase())} className="w-full bg-[#0a0a0a] border-2 border-zinc-800 rounded-2xl py-5 px-6 text-center text-base font-mono text-white placeholder-zinc-700 focus:border-red-600 transition-all outline-none"/><div className="absolute inset-0 border-2 border-transparent pointer-events-none rounded-2xl group-focus-within:border-red-600/50" /></div>
-                    <button onClick={handleStartNew} disabled={!nameInput.trim()} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95 disabled:opacity-30 disabled:grayscale">{t.start_journey}</button>
-                    {hasSave && (<button onClick={() => setIsNewGameMode(false)} className="w-full bg-transparent text-zinc-600 font-mono font-bold text-[10px] uppercase tracking-widest hover:text-zinc-400 transition-colors">Voltar para save</button>)}
+                    <button onClick={() => { if(!nameInput.trim()) return; startMusic(); initLevel(1, undefined, 0, nameInput); }} disabled={!nameInput.trim()} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95 disabled:opacity-30 disabled:grayscale">{t.start_journey}</button>
                   </div>
                 )}
-                <button className="w-full bg-transparent text-zinc-700 border border-zinc-800 rounded-2xl py-5 font-mono font-bold text-[10px] uppercase tracking-widest hover:text-zinc-500 hover:border-zinc-700 transition-all">{t.feedback}</button>
+                <button 
+                  onClick={() => window.open('https://t.me/c/2134721525/27', '_blank')}
+                  className="w-full bg-zinc-900 border-2 border-zinc-700 text-zinc-400 rounded-2xl py-4 font-mono font-bold text-[10px] uppercase tracking-widest hover:text-white hover:border-zinc-500 hover:bg-zinc-800 transition-all shadow-lg active:scale-95"
+                >
+                  {t.feedback}
+                </button>
               </div>
               <div className="flex justify-center gap-8 pt-4 border-t border-zinc-900">
-                <button onClick={() => setCurrentLang('PT')} className="relative flex flex-col items-center group"><div className={`transition-transform hover:scale-110 ${currentLang === 'PT' ? 'opacity-100 scale-110' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-80'}`}><Icon.FlagBR /></div>{currentLang === 'PT' && <div className="absolute -bottom-3 w-6 h-1 bg-red-600 rounded-full" />}</button>
-                <button onClick={() => setCurrentLang('EN')} className="relative flex flex-col items-center group"><div className={`transition-transform hover:scale-110 ${currentLang === 'EN' ? 'opacity-100 scale-110' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-80'}`}><Icon.FlagUS /></div>{currentLang === 'EN' && <div className="absolute -bottom-3 w-6 h-1 bg-red-600 rounded-full" />}</button>
-                <button onClick={() => setCurrentLang('ES')} className="relative flex flex-col items-center group"><div className={`transition-transform hover:scale-110 ${currentLang === 'ES' ? 'opacity-100 scale-110' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-80'}`}><Icon.FlagES /></div>{currentLang === 'ES' && <div className="absolute -bottom-3 w-6 h-1 bg-red-600 rounded-full" />}</button>
+                <button onClick={() => setCurrentLang('PT')} className="relative flex flex-col items-center group"><div className={`transition-transform hover:scale-110 ${currentLang === 'PT' ? 'opacity-100 scale-110' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-80'}`}><Icon.FlagBR /></div></button>
+                <button onClick={() => setCurrentLang('EN')} className="relative flex flex-col items-center group"><div className={`transition-transform hover:scale-110 ${currentLang === 'EN' ? 'opacity-100 scale-110' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-80'}`}><Icon.FlagUS /></div></button>
+                <button onClick={() => setCurrentLang('ES')} className="relative flex flex-col items-center group"><div className={`transition-transform hover:scale-110 ${currentLang === 'ES' ? 'opacity-100 scale-110' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-80'}`}><Icon.FlagES /></div></button>
               </div>
             </div>
           </div>
@@ -527,7 +349,7 @@ const App: React.FC = () => {
               <p className="text-[9px] font-mono text-zinc-500 font-bold uppercase tracking-[0.2em] mt-1">{t[THEME_CONFIG[gameState.theme].nameKey]} – {t.level} {gameState.level}</p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => window.open('https://t.me/+rzUhHnyeeSM1MDNh', '_blank')} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors"><Icon.Users /></button>
+              <button onClick={() => window.open('https://t.me/ComunidadeRQ', '_blank')} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors"><Icon.Users /></button>
               <button onClick={handleShare} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors"><Icon.Share /></button>
               <button onClick={() => setIsMuted(!isMuted)} className={`w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center transition-colors ${isMuted ? 'text-zinc-600' : 'text-red-800'}`}>{isMuted ? <Icon.VolumeX /> : <Icon.Volume2 />}</button>
             </div>
@@ -535,123 +357,56 @@ const App: React.FC = () => {
 
           <GameMap 
             map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} activePet={gameState.activePet} 
-            ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'}
-            keyPath={gameState.keyPath}
-            onTileClick={handleTileClick}
+            ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'} onTileClick={handleTileClick}
           />
 
           <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} onUsePotion={usePotionFromInventory}/>
         </div>
       )}
 
-      {gameState.gameStatus === 'TUTORIAL' && <TutorialModal onFinish={() => setGameState({ ...gameState, gameStatus: 'PLAYING' })} language={currentLang} />}
       {gameState.gameStatus === 'COMBAT' && gameState.currentEnemy && (
         <CombatModal 
-          playerStats={gameState.playerStats} 
-          enemy={gameState.currentEnemy} 
-          activePet={gameState.activePet} 
-          language={currentLang} 
-          altarEffect={gameState.activeAltarEffect} 
-          inventory={gameState.inventory}
-          onAttackSound={playAttackSound} 
-          onUsePotion={usePotionFromInventory}
-          onFinish={onCombatFinish}
+          playerStats={gameState.playerStats} enemy={gameState.currentEnemy} activePet={gameState.activePet} language={currentLang} 
+          altarEffect={gameState.activeAltarEffect} inventory={gameState.inventory} onAttackSound={playAttackSound} 
+          onUsePotion={usePotionFromInventory} onFinish={onCombatFinish}
         />
       )}
-      {gameState.gameStatus === 'CHEST_OPEN' && <ChestModal onChoice={onChestChoice} language={currentLang} doubleBonus={gameState.activeAltarEffect?.id === 'consecrated_chest'} />}
-      {gameState.gameStatus === 'PICKUP_CHOICE' && gameState.currentPotion && (
-        <PotionPickupModal potion={gameState.currentPotion} language={currentLang} onChoice={onPotionPickup} />
-      )}
-      {gameState.gameStatus === 'RELIC_SELECTION' && gameState.relicOptions && (
-        <RelicSelectionModal options={gameState.relicOptions} language={currentLang} onSelect={onRelicSelect} />
-      )}
+      {gameState.gameStatus === 'CHEST_OPEN' && <ChestModal onChoice={(choice) => {
+          setGameState(prev => {
+            if (!prev) return prev;
+            const stats = { ...prev.playerStats };
+            let multiplier = prev.activeAltarEffect?.id === 'consecrated_chest' ? 2 : 1;
+            if (choice === 'Ataque') stats.attack += 5 * multiplier;
+            if (choice === 'Armadura') { stats.maxArmor += 3 * multiplier; stats.armor += 3 * multiplier; }
+            if (choice === 'Velocidade') stats.speed += 4 * multiplier;
+            return { ...prev, playerStats: stats, gameStatus: 'PLAYING', activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect };
+          });
+      }} language={currentLang} doubleBonus={gameState.activeAltarEffect?.id === 'consecrated_chest'} />}
+      
       {gameState.gameStatus === 'ALTAR_INTERACTION' && (
         <AltarInteractionModal 
-            active={gameState.enemiesKilledInLevel > 0 && !gameState.hasUsedAltarInLevel} 
-            language={currentLang} 
-            onPray={onAltarPray} 
-            onClose={() => setGameState({ ...gameState, gameStatus: 'PLAYING' })} 
+          active={gameState.enemiesKilledInLevel > 0 && !gameState.hasUsedAltarInLevel} language={currentLang} 
+          onPray={() => {
+              setGameState(prev => {
+                if (!prev) return prev;
+                const isLucky = Math.random() > 0.4; 
+                const pool = isLucky ? BLESSINGS_POOL : CURSES_POOL;
+                const effect = pool[Math.floor(Math.random() * pool.length)];
+                let playerStats = { ...prev.playerStats };
+                if (effect.id === 'anxious_strike') playerStats.attack = Math.floor(playerStats.attack * 2); 
+                return { ...prev, gameStatus: 'ALTAR_RESULT', activeAltarEffect: effect, hasUsedAltarInLevel: true, playerStats };
+              });
+          }} onClose={() => setGameState({ ...gameState, gameStatus: 'PLAYING' })} 
         />
       )}
       {gameState.gameStatus === 'ALTAR_RESULT' && gameState.activeAltarEffect && (
-        <AltarResultModal 
-          effect={gameState.activeAltarEffect}
-          language={currentLang}
-          onClose={() => setGameState({ ...gameState, gameStatus: 'PLAYING' })}
-        />
+        <AltarResultModal effect={gameState.activeAltarEffect} language={currentLang} onClose={() => setGameState({ ...gameState, gameStatus: 'PLAYING' })} />
       )}
-      {gameState.gameStatus === 'MERCHANT_SHOP' && (
-        <MerchantShopModal gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} language={currentLang} 
-            discount={gameState.activeAltarEffect?.id === 'merchant_blessing'}
-            onBuyItem={(item) => {
-                setGameState(prev => {
-                    if (!prev || prev.gold < (item.price || 0)) return prev;
-                    const stats = { ...prev.playerStats };
-                    const statKey = item.stat;
-                    (stats as any)[statKey] += item.value;
-                    if (statKey === 'maxArmor') stats.armor += item.value;
-                    if (statKey === 'maxHp') stats.hp += item.value;
-                    return { ...prev, gold: prev.gold - (item.price || 0), playerStats: stats, logs: [...prev.logs, t.bought_item] };
-                });
-            }}
-            onBuyPotion={(pot, choice) => {
-                setGameState(prev => {
-                    if (!prev || prev.gold < (pot.price || 0)) return prev;
-                    const gold = prev.gold - (pot.price || 0);
-                    if (choice === 'use') {
-                        const stats = { ...prev.playerStats };
-                        stats.hp = Math.min(stats.maxHp, stats.hp + Math.floor(stats.maxHp * (pot.percent / 100)));
-                        return { ...prev, gold, playerStats: stats, logs: [...prev.logs, t.bought_potion] };
-                    } else {
-                        if (prev.inventory.length < prev.inventorySize) {
-                            return { ...prev, gold, inventory: [...prev.inventory, pot], logs: [...prev.logs, t.bought_potion] };
-                        } else { alert(t.inventory_full); return prev; }
-                    }
-                });
-            }}
-            onRentTron={() => {
-                setGameState(prev => {
-                    if (!prev || prev.gold < 25) return prev;
-                    return { ...prev, gold: prev.gold - 25, tronModeActive: true, tronTimeLeft: 15, tronTrail: [], logs: [...prev.logs, t.tron_active] };
-                });
-            }}
-            onBuyPet={(type) => {
-                setGameState(prev => {
-                    if (!prev) return prev;
-                    const cost = type === 'CORUJA' ? 12 : 10;
-                    if (prev.gold < cost) return prev;
-                    const pet: Pet = { type, name: type, hp: 50, maxHp: 50, pos: prev.playerPos };
-                    return { ...prev, gold: prev.gold - cost, activePet: pet, logs: [...prev.logs, t.bought_pet] };
-                });
-            }}
-            onClose={() => setGameState({ ...gameState, gameStatus: 'PLAYING' })}
-        />
-      )}
-      {gameState.gameStatus === 'LOST' && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in">
-          <div className="text-center space-y-2"><h2 className="text-6xl font-black text-red-600 tracking-tighter uppercase">{t.death_title}</h2><p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">{t.death_desc}</p></div>
-          <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl w-full max-w-xs space-y-4">
-            <h3 className="text-[10px] font-black text-zinc-600 uppercase text-center">{t.final_stats}</h3>
-            <div className="grid grid-cols-2 gap-4">
-               <div className="text-center"><p className="text-[8px] text-zinc-500 uppercase">{t.level}</p><p className="text-xl font-black text-white">{gameState.level}</p></div>
-               <div className="text-center"><p className="text-[8px] text-zinc-500 uppercase">{t.hp}</p><p className="text-lg font-black text-red-500">{gameState.playerStats.hp}/{gameState.playerStats.maxHp}</p></div>
-               <div className="text-center"><p className="text-[8px] text-zinc-500 uppercase">{t.atk}</p><p className="text-lg font-black text-yellow-500">{gameState.playerStats.attack}</p></div>
-               <div className="text-center"><p className="text-[8px] text-zinc-500 uppercase">{t.armor}</p><p className="text-lg font-black text-blue-500">{gameState.playerStats.maxArmor}</p></div>
-               <div className="text-center"><p className="text-[8px] text-zinc-500 uppercase">{t.vel}</p><p className="text-lg font-black text-green-500">{gameState.playerStats.speed}</p></div>
-               <div className="text-center"><p className="text-[8px] text-zinc-500 uppercase">OURO</p><p className="text-lg font-black text-yellow-400">{gameState.gold}</p></div>
-            </div>
-            {gameState.activeRelic && (<div className="pt-4 border-t border-zinc-800 text-center"><p className="text-[8px] text-zinc-500 uppercase mb-1">{t.relic_active}</p><p className="text-[10px] font-black text-purple-400 uppercase">{gameState.activeRelic.name}</p></div>)}
-          </div>
-          <button onClick={() => { setGameState(prev => prev ? ({ ...prev, gameStatus: 'RELIC_SELECTION', relicOptions: RELICS_POOL.sort(() => 0.5 - Math.random()).slice(0, 3)}) : prev); }} className="w-full max-w-xs py-5 bg-zinc-100 text-black font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-white transition-all transform active:scale-95">{t.rebirth}</button>
-        </div>
-      )}
+      
       {gameState.gameStatus === 'WON' && (
         <div className="fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in">
-          <div className="text-center space-y-2"><h2 className="text-6xl font-black text-green-500 tracking-tighter uppercase">{t.victory}</h2><p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">VOCÊ CONQUISTOU O ABISMO</p></div>
-          <div className="bg-zinc-900/50 border border-green-500/30 p-8 rounded-[2.5rem] w-full max-w-sm text-center">
-            <p className="text-white font-mono text-sm leading-relaxed mb-6">Herói, você desceu até as profundezas mais remotas e sobreviveu. Seu nome será gravado nas paredes do tempo.</p>
-            <button onClick={() => { localStorage.removeItem('rq_save_mobile_v2'); window.location.reload(); }} className="w-full py-5 bg-green-600 text-white font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-green-500 transition-all">NOVA JORNADA</button>
-          </div>
+          <div className="text-center space-y-2"><h2 className="text-6xl font-black text-green-500 tracking-tighter uppercase">VITÓRIA</h2><p className="text-zinc-500 font-bold text-xs uppercase tracking-widest">VOCÊ CONQUISTOU O ABISMO</p></div>
+          <button onClick={() => { localStorage.removeItem('rq_save_v150_final'); window.location.reload(); }} className="w-full py-5 bg-green-600 text-white font-black rounded-2xl uppercase tracking-widest text-sm hover:bg-green-500 transition-all">REINICIAR LENDA</button>
         </div>
       )}
     </div>

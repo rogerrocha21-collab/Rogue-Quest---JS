@@ -68,7 +68,7 @@ const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, play
         {/* Nível e Pet Card */}
         <div className="bg-zinc-900/80 border border-zinc-800 p-3 rounded-xl flex flex-col justify-between">
           <div className="flex justify-between items-center mb-1">
-            <h3 className="text-zinc-500 uppercase text-[8px] font-bold tracking-widest text-center">{t.level.toUpperCase()} {level} / ?</h3>
+            <h3 className="text-zinc-500 uppercase text-[8px] font-bold tracking-widest text-center">{t.level.toUpperCase()} {level}</h3>
             <div className="flex gap-2 items-center">
               {activePet && (
                 <div className="flex items-center gap-1 text-orange-400 animate-pulse">

@@ -1,7 +1,7 @@
 
 export type TileType = 'WALL' | 'FLOOR' | 'PLAYER' | 'ENEMY' | 'CHEST' | 'STAIRS' | 'POTION' | 'ITEM' | 'KEY' | 'MERCHANT' | 'EMPTY' | 'ALTAR';
 
-export type LevelTheme = 'FOREST' | 'DESERT' | 'SNOW' | 'CAVE' | 'MATRIX' | 'INFERNO' | 'VOID';
+export type LevelTheme = 'FOREST' | 'DESERT' | 'SNOW' | 'CAVE' | 'MATRIX' | 'INFERNO' | 'VOID' | 'RUINS' | 'MECHANICAL' | 'CORRUPTED' | 'CATACOMBS' | 'OSSUARY' | 'ASTRAL';
 
 export type Language = 'PT' | 'EN' | 'ES';
 
