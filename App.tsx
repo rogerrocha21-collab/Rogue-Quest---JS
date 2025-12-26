@@ -152,7 +152,6 @@ const App: React.FC = () => {
     setMoveQueue([]);
   }, [nameInput, currentLang, saveGame]);
 
-  // LOOP DE MOVIMENTO ROBUSTO
   useEffect(() => {
     if (moveQueue.length === 0 || !gameState || gameState.gameStatus !== 'PLAYING') return;
 
@@ -163,22 +162,20 @@ const App: React.FC = () => {
         if (!prev || prev.gameStatus !== 'PLAYING' || moveQueue.length === 0) return prev;
 
         const { x, y } = nextPos;
-        
-        // Verifica se é um passo válido (adjacente ao playerPosRef atual)
         const dx = Math.abs(x - playerPosRef.current.x);
         const dy = Math.abs(y - playerPosRef.current.y);
+        
         if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) {
            setMoveQueue([]);
            return prev;
         }
 
-        // Colisão com parede
         if (prev.map[y][x] === 'WALL') {
           setMoveQueue([]);
           return prev;
         }
 
-        // Interações
+        // Interações - A ORDEM IMPORTA
         const enemy = prev.enemies.find(e => e.x === x && e.y === y);
         if (enemy) {
           setMoveQueue([]);
@@ -191,17 +188,18 @@ const App: React.FC = () => {
           return { ...prev, gameStatus: 'CHEST_OPEN' as const, chests: prev.chests.filter(c => c.id !== chest.id) };
         }
 
-        const potion = prev.potions.find(p => p.x === x && p.y === y);
-        if (potion) {
-          setMoveQueue([]);
-          return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) };
-        }
-
+        // Chave e poções só são processadas se não houver combate ou baú no mesmo tile
         if (prev.keyPos && x === prev.keyPos.x && y === prev.keyPos.y && !prev.hasKey) {
           playChime();
           setMoveQueue(q => q.slice(1));
           playerPosRef.current = nextPos;
           return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos };
+        }
+
+        const potion = prev.potions.find(p => p.x === x && p.y === y);
+        if (potion) {
+          setMoveQueue([]);
+          return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) };
         }
 
         if (prev.merchantPos && x === prev.merchantPos.x && y === prev.merchantPos.y) {
@@ -228,7 +226,6 @@ const App: React.FC = () => {
           }
         }
 
-        // Avança um passo na fila
         setMoveQueue(q => q.slice(1));
         playerPosRef.current = nextPos;
         return { ...prev, playerPos: nextPos, keyPath: prev.keyPath ? prev.keyPath.slice(1) : undefined };
@@ -400,6 +397,45 @@ const App: React.FC = () => {
           });
       }} language={currentLang} doubleBonus={gameState.activeAltarEffect?.id === 'consecrated_chest'} />}
       
+      {gameState.gameStatus === 'MERCHANT_SHOP' && (
+        <MerchantShopModal 
+          gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} language={currentLang}
+          onBuyItem={(item) => {
+              setGameState(prev => {
+                if(!prev) return prev;
+                const stats = { ...prev.playerStats };
+                stats[item.stat as keyof EntityStats] += item.value;
+                if(item.stat === 'maxArmor') stats.armor += item.value;
+                return { ...prev, gold: prev.gold - item.price!, playerStats: stats };
+              });
+          }}
+          onBuyPotion={(pot, choice) => {
+             if(choice === 'use') {
+               setGameState(prev => {
+                 if(!prev) return prev;
+                 const stats = { ...prev.playerStats };
+                 const heal = Math.floor(stats.maxHp * (pot.percent / 100));
+                 stats.hp = Math.min(stats.maxHp, stats.hp + heal);
+                 return { ...prev, gold: prev.gold - pot.price!, playerStats: stats };
+               });
+             } else {
+               setGameState(prev => {
+                 if(!prev) return prev;
+                 return { ...prev, gold: prev.gold - pot.price!, inventory: [...prev.inventory, pot] };
+               });
+             }
+          }}
+          onRentTron={() => {
+              setGameState(prev => prev ? { ...prev, gold: prev.gold - 25, tronModeActive: true, tronTimeLeft: 15, gameStatus: 'PLAYING' as const } : null);
+          }}
+          onBuyPet={(type) => {
+             const pet: Pet = { type, name: type, hp: 50, maxHp: 50, pos: { ...playerPosRef.current } };
+             setGameState(prev => prev ? { ...prev, gold: prev.gold - (type === 'CORUJA' ? 12 : 10), activePet: pet } : null);
+          }}
+          onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } : null)}
+        />
+      )}
+
       {gameState.gameStatus === 'ALTAR_INTERACTION' && (
         <AltarInteractionModal 
           active={gameState.enemiesKilledInLevel > 0 && !gameState.hasUsedAltarInLevel} language={currentLang} 

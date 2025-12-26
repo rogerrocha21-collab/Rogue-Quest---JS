@@ -63,48 +63,61 @@ export function generateDungeon(level: number) {
   const lastRoom = rooms[rooms.length - 1];
   const stairsPos = { x: lastRoom.x, y: lastRoom.y };
 
-  const enemies: Enemy[] = [];
-  const chests: Chest[] = [];
-  const potions: PotionEntity[] = [];
+  const occupied = new Set<string>();
+  occupied.add(`${playerPos.x},${playerPos.y}`);
+  occupied.add(`${stairsPos.x},${stairsPos.y}`);
 
-  const keyRoom = rooms[Math.floor(Math.random() * (rooms.length - 1)) + 1];
-  const keyPos = { x: keyRoom.x, y: keyRoom.y };
+  const getFreeTile = () => {
+    for(let i=0; i<500; i++) {
+      const room = rooms[Math.floor(Math.random() * rooms.length)];
+      const rx = room.x + Math.floor(Math.random() * room.w);
+      const ry = room.y + Math.floor(Math.random() * room.h);
+      const key = `${rx},${ry}`;
+      if(!occupied.has(key)) {
+        occupied.add(key);
+        return {x: rx, y: ry};
+      }
+    }
+    return null;
+  };
 
-  const altarRoom = rooms[Math.floor(Math.random() * rooms.length)];
-  const altarPos = { x: altarRoom.x, y: altarRoom.y };
-
+  const keyPos = getFreeTile() || { x: rooms[1].x, y: rooms[1].y };
+  const altarPos = getFreeTile() || { x: rooms[2].x, y: rooms[2].y };
+  
   let merchantPos: Position | undefined;
-  if (level % 3 === 0 || level < 10) {
-    const mRoom = rooms[Math.floor(Math.random() * rooms.length)];
-    merchantPos = { x: mRoom.x, y: mRoom.y };
+  if (level % 3 === 0 || level === 1) {
+    merchantPos = getFreeTile() || undefined;
   }
 
-  let targetEnemies = 15; // Garantido 15 inimigos por andar
-  let placed = 0;
-  let attempts = 0;
-  while (placed < targetEnemies && attempts < 3000) {
-    attempts++;
+  const enemies: Enemy[] = [];
+  const targetEnemies = 15;
+  let placedEnemies = 0;
+  while (placedEnemies < targetEnemies) {
     const rx = Math.floor(Math.random() * MAP_WIDTH);
     const ry = Math.floor(Math.random() * MAP_HEIGHT);
-    if (map[ry][rx] === 'FLOOR' && !(rx === playerPos.x && ry === playerPos.y) && !(rx === stairsPos.x && ry === stairsPos.y)) {
+    if (map[ry][rx] === 'FLOOR' && !occupied.has(`${rx},${ry}`)) {
       const types = ENEMY_TYPES.filter(t => t.minLevel <= level);
       const type = types[Math.floor(Math.random() * types.length)].name;
       enemies.push({
-        id: `e-${level}-${placed}`,
+        id: `e-${level}-${placedEnemies}`,
         x: rx, y: ry,
         type: type,
         stats: generateEnemyStats(level, false),
         isBoss: false
       });
-      placed++;
+      occupied.add(`${rx},${ry}`);
+      placedEnemies++;
     }
   }
 
+  const chests: Chest[] = [];
   const numChests = Math.random() > 0.7 ? 2 : 1;
   for(let i=0; i<numChests; i++) {
-    const cRoom = rooms[Math.floor(Math.random() * rooms.length)];
-    chests.push({ id: `c-${level}-${i}`, x: cRoom.x, y: cRoom.y });
+    const pos = getFreeTile();
+    if(pos) chests.push({ id: `c-${level}-${i}`, x: pos.x, y: pos.y });
   }
+
+  const potions: PotionEntity[] = [];
 
   return { map, theme, playerPos, stairsPos, enemies, chests, potions, keyPos, merchantPos, altarPos };
 }
@@ -143,7 +156,6 @@ export function findDungeonPath(start: Position, end: Position, map: TileType[][
         const hasEnemy = enemies.some(e => e.x === nx && e.y === ny);
         const isTarget = nx === end.x && ny === end.y;
 
-        // Só pode entrar no tile se não tiver inimigo, OU se o inimigo for o alvo do clique (para iniciar combate)
         if (!hasEnemy || isTarget) {
           visited.add(key);
           queue.push({ 
