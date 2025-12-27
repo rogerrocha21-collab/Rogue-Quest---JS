@@ -126,19 +126,25 @@ const App: React.FC = () => {
     let currentGold = gold ?? 0;
     let invSize = 5;
     let startInventory = inventory || [];
+    
     if (level === 1) {
         if (activeRelic?.id === 'slots') invSize = 10;
         if (activeRelic?.id === 'gaze') startInventory.push({ id: 'relic-potion', percent: 70, x: 0, y: 0 });
         if (activeRelic?.id === 'mark') { currentGold += 60; currentStats.maxHp = Math.floor(currentStats.maxHp * 0.9); currentStats.hp = currentStats.maxHp; }
         if (activeRelic?.id === 'heart') { currentStats.attack = Math.floor(currentStats.attack * 1.1); currentStats.maxHp = Math.floor(currentStats.maxHp * 0.95); currentStats.hp = Math.min(currentStats.hp, currentStats.maxHp); }
+    } else {
+        // Redefine o tamanho do inventário caso não haja maldição no andar anterior que foi limpa
+        if (activeRelic?.id === 'slots') invSize = 10;
     }
-    if (activeRelic?.id === 'slots') invSize = 10;
+
     const finalPlayerName = name || nameInput;
     const newState: GameState = {
       ...dungeon, playerName: finalPlayerName, gold: currentGold, level, playerStats: currentStats, items: [], hasKey: false, enemiesKilledInLevel: 0,
       gameStatus: (level === 1 && !stats) ? 'TUTORIAL' as const : 'PLAYING' as const,
       logs: (level === 1 && !stats) ? [`${finalPlayerName} entrou no abismo.`] : [`Descendo para o nível ${level}`],
-      inventory: startInventory, inventorySize: invSize, activePet, activeRelic, language: currentLang, hasUsedAltarInLevel: false, tronModeActive: false, tronTimeLeft: 0, tronTrail: []
+      inventory: startInventory, inventorySize: invSize, activePet, activeRelic, language: currentLang, hasUsedAltarInLevel: false, tronModeActive: false, tronTimeLeft: 0, tronTrail: [],
+      // IMPORTANTE: Bençãos e Maldições são limpas entre andares
+      activeAltarEffect: undefined, keyPath: undefined 
     };
     playerPosRef.current = newState.playerPos;
     setGameState(newState);
@@ -162,25 +168,33 @@ const App: React.FC = () => {
         const oldPos = { ...prev.playerPos };
         const updatedPet = prev.activePet ? { ...prev.activePet, pos: oldPos } : undefined;
         const enemy = prev.enemies.find(e => e.x === nextPos.x && e.y === nextPos.y);
+        
         if (enemy) { setMoveQueue([]); return { ...prev, gameStatus: 'COMBAT' as const, currentEnemy: enemy } as GameState; }
+        
         const chest = prev.chests.find(c => c.x === nextPos.x && c.y === nextPos.y);
         if (chest) { setMoveQueue([]); return { ...prev, gameStatus: 'CHEST_OPEN' as const, chests: prev.chests.filter(c => c.id !== chest.id) } as GameState; }
+        
         if (prev.keyPos && nextPos.x === prev.keyPos.x && nextPos.y === prev.keyPos.y && !prev.hasKey) {
           playChime(); setMoveQueue(q => q.slice(1)); playerPosRef.current = nextPos;
           return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos, activePet: updatedPet } as GameState;
         }
+        
         const potion = prev.potions.find(p => p.x === nextPos.x && p.y === nextPos.y);
         if (potion) { setMoveQueue([]); return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) } as GameState; }
+        
         if (prev.merchantPos && nextPos.x === prev.merchantPos.x && nextPos.y === prev.merchantPos.y) {
           setMoveQueue([]); playerPosRef.current = nextPos; return { ...prev, gameStatus: 'MERCHANT_SHOP' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
         }
+        
         if (prev.altarPos && nextPos.x === prev.altarPos.x && nextPos.y === prev.altarPos.y) {
           setMoveQueue([]); playerPosRef.current = nextPos; return { ...prev, gameStatus: 'ALTAR_INTERACTION' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
         }
+        
         if (nextPos.x === prev.stairsPos.x && nextPos.y === prev.stairsPos.y) {
           if (prev.hasKey && prev.enemiesKilledInLevel > 0) { playChime(); setMoveQueue([]); return { ...prev, gameStatus: 'NEXT_LEVEL' as const } as GameState; }
           else { setMoveQueue(q => q.slice(1)); playerPosRef.current = nextPos; return { ...prev, logs: [...prev.logs, t.log_locked], playerPos: nextPos, activePet: updatedPet } as GameState; }
         }
+        
         setMoveQueue(q => q.slice(1));
         playerPosRef.current = nextPos;
         let newTrail = prev.tronTrail || [];
@@ -200,31 +214,34 @@ const App: React.FC = () => {
       
       const updatedPet = prev.activePet ? { ...prev.activePet, hp: petHp || 0 } : undefined;
       let finalGoldEarned = goldEarned;
+
+      // Bençãos/Relíquias de Ouro
       if (prev.activeRelic?.id === 'bag') finalGoldEarned = Math.floor(finalGoldEarned * 1.05);
-      if (prev.activeRelic?.id === 'coin' && Math.random() < 0.05) finalGoldEarned += 15;
       if (prev.activeAltarEffect?.id === 'sacred_greed') finalGoldEarned = Math.floor(finalGoldEarned * 1.5);
       if (prev.activeAltarEffect?.id === 'cursed_greed') finalGoldEarned = Math.floor(finalGoldEarned * 0.5);
       
       let nextStats = { ...newStats };
-      if (prev.activeRelic?.id === 'vamp') {
-        const heal = Math.floor(nextStats.maxHp * 0.15);
-        nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + heal);
+
+      // Benção Sangue Afiado (+10% dano permanente no andar após primeira morte)
+      if (prev.activeAltarEffect?.id === 'sharp_blood') {
+         nextStats.attack = Math.floor(nextStats.attack * 1.1);
       }
+
+      // Benção Sangue Rendido (Cura 30% ao matar)
       if (prev.activeAltarEffect?.id === 'surrendered_blood') {
         nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.3));
       }
-      if (prev.activeAltarEffect?.id === 'sharp_blood') {
-        nextStats.attack = Math.floor(nextStats.attack * 1.1);
-      }
+
+      // Maldição Tributo de Sangue (Perde HP ao ganhar ouro)
       if (prev.activeAltarEffect?.id === 'blood_tribute' && finalGoldEarned > 0) {
         nextStats.hp = Math.max(1, nextStats.hp - 5);
       }
+
       playCoinSound();
       const updated: GameState = {
         ...prev, playerStats: nextStats, gold: prev.gold + finalGoldEarned, gameStatus: 'PLAYING' as const,
         enemies: prev.enemies.filter(e => e.id !== prev.currentEnemy?.id),
-        enemiesKilledInLevel: prev.enemiesKilledInLevel + 1, activePet: updatedPet, currentEnemy: undefined, keyPath: undefined,
-        activeAltarEffect: prev.activeAltarEffect?.id === 'anxious_strike' ? undefined : prev.activeAltarEffect
+        enemiesKilledInLevel: prev.enemiesKilledInLevel + 1, activePet: updatedPet, currentEnemy: undefined, keyPath: undefined
       };
       saveGame(updated);
       return updated;
@@ -236,21 +253,32 @@ const App: React.FC = () => {
     let used = false;
     setGameState(prev => {
       if (!prev || !prev.inventory[idx]) return prev;
+      
+      // Maldição Oferta Negada (Poção desperdiçada)
       if (prev.activeAltarEffect?.id === 'denied_offering') {
         const newInv = [...prev.inventory];
         newInv.splice(idx, 1);
         used = true;
         return { ...prev, activeAltarEffect: undefined, inventory: newInv } as GameState;
       }
+
       const pot = prev.inventory[idx];
       const stats = { ...prev.playerStats };
       let boost = pot.percent;
-      if (prev.activeRelic?.id === 'alch') boost += 5;
+      
+      // Maldição Sede Profana (-10% eficácia)
       if (prev.activeAltarEffect?.id === 'profane_thirst') boost -= 10;
+      
       const heal = Math.floor(stats.maxHp * (boost / 100));
       stats.hp = Math.min(stats.maxHp, stats.hp + heal);
+      
       const newInv = [...prev.inventory];
-      if (prev.activeAltarEffect?.id !== 'accepted_offering') newInv.splice(idx, 1);
+      
+      // Benção Oferta Aceita (Não consome a poção)
+      if (prev.activeAltarEffect?.id !== 'accepted_offering') {
+        newInv.splice(idx, 1);
+      }
+      
       used = true;
       return { ...prev, playerStats: stats, inventory: newInv, activeAltarEffect: prev.activeAltarEffect?.id === 'accepted_offering' ? undefined : prev.activeAltarEffect } as GameState;
     });
@@ -345,7 +373,10 @@ const App: React.FC = () => {
               <button onClick={() => setIsMuted(!isMuted)} className={`w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center transition-colors ${isMuted ? 'text-zinc-600' : 'text-red-800'}`}>{isMuted ? <Icon.VolumeX /> : <Icon.Volume2 />}</button>
             </div>
           </header>
-          <GameMap map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} keyPath={gameState.keyPath} onTileClick={handleTileClick} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} />
+          <GameMap 
+            map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} keyPath={gameState.keyPath} onTileClick={handleTileClick} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} 
+            ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'}
+          />
           <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}/>
         </div>
       )}
@@ -416,7 +447,7 @@ const App: React.FC = () => {
             return { ...prev, playerStats: stats, gameStatus: 'PLAYING' as const, activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect } as GameState;
           });
       }} language={currentLang} />}
-      {gameState.gameStatus === 'MERCHANT_SHOP' && <MerchantShopModal gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} language={currentLang} onBuyItem={(item) => {
+      {gameState.gameStatus === 'MERCHANT_SHOP' && <MerchantShopModal gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} language={currentLang} activeAltarEffect={gameState.activeAltarEffect} onBuyItem={(item) => {
           setGameState(prev => {
             if(!prev) return prev;
             const stats = { ...prev.playerStats };
@@ -444,24 +475,39 @@ const App: React.FC = () => {
           const pet: Pet = { type, name: type, hp: 50, maxHp: 50, pos: { ...playerPosRef.current } };
           setGameState(prev => prev ? { ...prev, gold: prev.gold - 10, activePet: pet } as GameState : null);
       }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)} />}
+      
       {gameState.gameStatus === 'ALTAR_INTERACTION' && <AltarInteractionModal active={gameState.enemiesKilledInLevel > 0 && !gameState.hasUsedAltarInLevel} language={currentLang} onPray={() => {
           setGameState(prev => {
             if (!prev) return prev;
             const isLucky = Math.random() > 0.4; 
             const pool = isLucky ? BLESSINGS_POOL : CURSES_POOL;
             const effect = pool[Math.floor(Math.random() * pool.length)];
+            
             let playerStats = { ...prev.playerStats };
-            if (effect.id === 'anxious_strike') playerStats.attack = Math.floor(playerStats.attack * 2); 
             let keyPath: Position[] | undefined = undefined;
+            let inventorySize = prev.inventorySize;
+
+            // Benção: Olhos Abertos
             if (effect.id === 'open_eyes' && prev.keyPos) {
                 const path = findDungeonPath(prev.playerPos, prev.keyPos, prev.map, prev.enemies);
                 if (path) keyPath = path;
             }
-            let inventorySize = prev.inventorySize;
+
+            // Maldição: Menos Peso
             if (effect.id === 'less_weight') inventorySize = Math.max(1, inventorySize - 2);
-            return { ...prev, gameStatus: 'ALTAR_RESULT' as const, activeAltarEffect: effect, hasUsedAltarInLevel: true, playerStats, keyPath, inventorySize } as GameState;
+
+            return { 
+                ...prev, 
+                gameStatus: 'ALTAR_RESULT' as const, 
+                activeAltarEffect: effect, 
+                hasUsedAltarInLevel: true, 
+                playerStats, 
+                keyPath, 
+                inventorySize 
+            } as GameState;
           });
       }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } : null)} />}
+      
       {gameState.gameStatus === 'ALTAR_RESULT' && gameState.activeAltarEffect && <AltarResultModal effect={gameState.activeAltarEffect} language={currentLang} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)} />}
       {gameState.gameStatus === 'RELIC_SELECTION' && gameState.relicOptions && <RelicSelectionModal options={gameState.relicOptions} language={currentLang} onSelect={handleRelicSelect} />}
       {gameState.gameStatus === 'TUTORIAL' && <TutorialModal onFinish={() => setGameState({...gameState, gameStatus: 'PLAYING' as const})} language={currentLang} />}

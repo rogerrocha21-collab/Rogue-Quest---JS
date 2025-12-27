@@ -56,8 +56,10 @@ export const CombatModal: React.FC<CombatModalProps> = ({
       const executeSequence = async () => {
         turnCount++;
         
-        // Mascote sempre ataca PRIMEIRO (Iniciativa)
-        if (activePet && curPetHp > 0) {
+        // Maldição Reflexos Lentos: Inimigo ataca PRIMEIRO, ignorando pet e speed
+        const enemyHasInitiative = altarEffect?.id === 'slow_reflexes';
+
+        if (!enemyHasInitiative && activePet && curPetHp > 0) {
             setLastAttacker('pet'); 
             setIsTakingDamage('enemy');
             if (onAttackSound) onAttackSound('player');
@@ -71,17 +73,19 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             if (e.hp <= 0) { setIsDone(true); return; }
         }
 
-        const enemiesFirst = altarEffect?.id === 'slow_reflexes';
-        const playersTurn = !enemiesFirst && (pRef.current.speed >= e.speed);
+        const playersTurn = !enemyHasInitiative && (pRef.current.speed >= e.speed);
         const turnOrder = playersTurn ? ['player', 'enemy'] : ['enemy', 'player'];
 
         const processSide = async (side: 'player' | 'enemy') => {
             if (pRef.current.hp <= 0 || e.hp <= 0) return;
             
+            // Maldição Fôlego Curto
             if (side === 'player' && altarEffect?.id === 'short_breath' && lastPlayerAttackTurn === turnCount - 1) {
                 addLog(`Você recupera o fôlego...`, 'info');
                 return;
             }
+            
+            // Maldição Mãos Trêmulas
             if (side === 'player' && altarEffect?.id === 'trembling_hands' && Math.random() < 0.25) {
                 addLog(`Você errou o ataque!`, 'player');
                 return;
@@ -90,17 +94,29 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             let atkValue = side === 'player' ? pRef.current.attack : e.attack;
             
             if (side === 'player') {
+                // Relíquia Power
                 if (relic?.id === 'power' && isFirstPlayerHitInCombat) {
                     atkValue = Math.floor(atkValue * 1.1);
-                    isFirstPlayerHitInCombat = false;
                 }
+                
+                // Benção Golpe Ansioso (Dano Dobrado)
+                if (altarEffect?.id === 'anxious_strike' && isFirstPlayerHitInCombat) {
+                    atkValue *= 2;
+                    addLog(`GOLPE ANSIOSO!`, 'player');
+                }
+
+                // Relíquia Crit
                 if (relic?.id === 'crit' && Math.random() < 0.05) {
                     atkValue *= 2;
                     addLog(`GOLPE CRÍTICO!`, 'player');
                 }
+                
+                // Benção Fúria Contida
                 if (altarEffect?.id === 'contained_fury' && pRef.current.hp < (pRef.current.maxHp / 2)) {
                     atkValue = Math.floor(atkValue * 1.15);
                 }
+
+                isFirstPlayerHitInCombat = false;
             }
 
             setLastAttacker(side); setIsTakingDamage(side === 'player' ? 'enemy' : 'player');
@@ -109,18 +125,38 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             let defender = side === 'player' ? e : pRef.current;
             let originalAtk = atkValue;
             
+            // Relíquia Defesa
             if (side === 'enemy' && relic?.id === 'defense') originalAtk = Math.max(1, originalAtk - 1);
+            
+            // Maldição Sangue Frágil (+10% dano recebido)
             if (side === 'enemy' && altarEffect?.id === 'fragile_blood') originalAtk = Math.floor(originalAtk * 1.1);
 
             let currentAtkForCalculation = originalAtk;
-            if (defender.armor > 0) {
-              let absorbed = Math.min(defender.armor, currentAtkForCalculation);
-              defender.armor = Math.max(0, defender.armor - absorbed);
+            
+            // Benção Punhos Consagrados (Ignora parte da defesa)
+            const armorToConsider = (side === 'player' && altarEffect?.id === 'consecrated_fists') 
+                ? Math.floor(defender.armor / 2) 
+                : defender.armor;
+
+            if (armorToConsider > 0) {
+              let absorbed = Math.min(armorToConsider, currentAtkForCalculation);
+              if (side === 'player') {
+                e.armor = Math.max(0, e.armor - absorbed);
+              } else {
+                pRef.current.armor = Math.max(0, pRef.current.armor - absorbed);
+              }
               currentAtkForCalculation -= absorbed;
             }
+
             if (currentAtkForCalculation > 0) defender.hp -= currentAtkForCalculation;
-            
             if (defender.hp < 0) defender.hp = 0;
+            
+            // Maldição Marca da Presa (Sangramento)
+            if (side === 'enemy' && altarEffect?.id === 'mark_of_prey') {
+                pRef.current.hp = Math.max(1, pRef.current.hp - 2);
+                addLog(`Você está sangrando! (-2 HP)`, 'enemy');
+            }
+
             if (side === 'player') lastPlayerAttackTurn = turnCount;
 
             const msg = side === 'player' ? `Você atacou o inimigo causando ${originalAtk} de dano` : `O inimigo atacou causando ${originalAtk} de dano`;
@@ -131,10 +167,24 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             setIsTakingDamage(null);
         };
 
+        // Ordem do turno considerando a iniciativa do inimigo
         await processSide(turnOrder[0] as any);
         if (pRef.current.hp > 0 && e.hp > 0) {
             await new Promise(r => setTimeout(r, 200)); 
             await processSide(turnOrder[1] as any);
+            
+            // Se o inimigo teve iniciativa, o pet ataca agora no final
+            if (enemyHasInitiative && activePet && curPetHp > 0 && pRef.current.hp > 0 && e.hp > 0) {
+                 setLastAttacker('pet'); 
+                 setIsTakingDamage('enemy');
+                 let petAtk = Math.max(1, Math.floor(pRef.current.attack / 2));
+                 e.hp -= petAtk; if (e.hp < 0) e.hp = 0;
+                 addLog(`Mascote contra-atacou causando ${petAtk} de dano`, 'pet');
+                 setCurrentEStats({ ...e });
+                 await new Promise(r => setTimeout(r, 600)); 
+                 setIsTakingDamage(null);
+            }
+
             if (pRef.current.hp > 0 && e.hp > 0) setTimeout(resolveTurn, 500);
             else setIsDone(true);
         } else { setIsDone(true); }
@@ -193,7 +243,8 @@ export const CombatModal: React.FC<CombatModalProps> = ({
               <p key={i} className={`text-[11px] leading-tight font-bold ${
                 log.type === 'player' ? 'text-cyan-400' : 
                 log.type === 'enemy' ? 'text-red-400' : 
-                log.type === 'pet' ? 'text-orange-400' : 'text-zinc-600'
+                log.type === 'pet' ? 'text-orange-400' : 
+                log.type === 'info' ? 'text-yellow-600' : 'text-zinc-600'
               }`}>
                 {log.msg}
               </p>
@@ -204,7 +255,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
         {!isDone && inventory && inventory.length > 0 && (
           <div className="flex justify-center flex-wrap gap-2 p-3 bg-[#111] rounded-2xl border border-[#222]">
             {inventory.map((pot, i) => {
-               const potName = pot.percent <= 25 ? 'Poção Pequena' : pot.percent <= 50 ? 'Poção Média' : 'Poção Grande';
+               const potName = pot.percent <= 25 ? 'Pequena' : pot.percent <= 50 ? 'Média' : 'Grande';
                return (
                 <button key={i} onClick={() => handleUsePotion(i)} className="flex items-center gap-2 px-4 py-2 bg-pink-950/10 border border-pink-500/20 rounded-xl text-pink-500 hover:bg-pink-900/20 active:scale-95 transition-all group overflow-hidden">
                   <Icon.Potion width={14} height={14} />
@@ -229,22 +280,25 @@ export const CombatModal: React.FC<CombatModalProps> = ({
 };
 
 export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
-  gold, level, hasPet, language = 'PT', onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose
+  gold, level, hasPet, language = 'PT', onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose, activeAltarEffect
 }) => {
   const t = TRANSLATIONS[language];
+  const isMerchantBlessing = activeAltarEffect?.id === 'merchant_blessing';
+  const priceMult = isMerchantBlessing ? 0.8 : 1.0;
+
   const shopItems = useMemo(() => {
     return [...ITEM_POOL].sort(() => 0.5 - Math.random()).slice(0, 3).map(item => ({
         ...item, id: `shop-item-${Math.random()}`,
-        price: Math.floor(item.basePrice * (1 + level * 0.1)),
+        price: Math.floor(item.basePrice * (1 + level * 0.1) * priceMult),
         x: 0, y: 0
       })) as ItemEntity[];
-  }, [level]);
+  }, [level, priceMult]);
 
   const potions = useMemo(() => [
-    { id: 'p25', percent: 25, price: 12 },
-    { id: 'p50', percent: 50, price: 25 },
-    { id: 'p75', percent: 75, price: 40 }
-  ], []);
+    { id: 'p25', percent: 25, price: Math.floor(12 * priceMult) },
+    { id: 'p50', percent: 50, price: Math.floor(25 * priceMult) },
+    { id: 'p75', percent: 75, price: Math.floor(40 * priceMult) }
+  ], [priceMult]);
 
   return (
     <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4 backdrop-blur-lg">
@@ -254,6 +308,7 @@ export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
             <h2 className="text-xl font-black text-white uppercase tracking-tighter">{t.merchant_title}</h2>
             <div className="flex items-center gap-2 text-yellow-500 font-black text-[11px] mt-1">
               <Icon.Gold /> <span>{gold} MOEDAS</span>
+              {isMerchantBlessing && <span className="text-green-500 text-[8px] ml-2">(-20% OFF)</span>}
             </div>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white p-2"><Icon.VolumeX /></button>
@@ -455,6 +510,7 @@ interface MerchantShopModalProps {
   onRentTron: () => void;
   onBuyPet: (type: Pet['type']) => void;
   onClose: () => void;
+  activeAltarEffect?: AltarEffect;
 }
 
 interface TutorialModalProps { onFinish: () => void; language?: Language; }

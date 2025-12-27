@@ -59,12 +59,12 @@ const GameMap: React.FC<GameMapProps> = ({
     const isTrail = tronModeActive && tronTrail.some(tp => tp.x === x && tp.y === y);
     const isKeyPath = !hasKey && keyPath.some(kp => kp.x === x && kp.y === y);
 
+    // Lógica da Maldição Escuridão Ritual
     let fogOpacity = "opacity-100";
-    if (ritualDarkness) {
-        const dist = Math.sqrt(Math.pow(x - playerPos.x, 2) + Math.pow(y - playerPos.y, 2));
-        if (dist > 3) fogOpacity = "opacity-0 pointer-events-none";
-        else if (dist > 2) fogOpacity = "opacity-20";
-        else if (dist > 1) fogOpacity = "opacity-50";
+    if (ritualDarkness && !isPlayer) {
+        const dist = Math.max(Math.abs(x - playerPos.x), Math.abs(y - playerPos.y));
+        if (dist > 2) fogOpacity = "opacity-0 pointer-events-none";
+        else if (dist > 1) fogOpacity = "opacity-20";
     }
 
     return (
@@ -96,7 +96,7 @@ const GameMap: React.FC<GameMapProps> = ({
         ) : isStairs ? (
           <span className={`${TILE_COLORS.STAIRS} animate-pulse scale-110 z-10`}><Icon.Stairs /></span>
         ) : isKeyPath ? (
-           <div className="w-1 h-1 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_5px_yellow]" />
+           <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_yellow] z-0" />
         ) : isTrail ? (
           <div className="w-full h-full bg-cyan-400/20 animate-pulse flex items-center justify-center">
             <div className="w-full h-full border border-cyan-400/30 shadow-[0_0_10px_#22d3ee]" />
