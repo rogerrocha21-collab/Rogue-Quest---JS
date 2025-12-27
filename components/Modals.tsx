@@ -56,7 +56,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
       const executeSequence = async () => {
         turnCount++;
         
-        // Pet Turn - SEMPRE PRIMEIRO (Iniciativa absoluta)
+        // Mascote sempre ataca PRIMEIRO (Iniciativa)
         if (activePet && curPetHp > 0) {
             setLastAttacker('pet'); 
             setIsTakingDamage('enemy');
@@ -64,9 +64,9 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             let petAtk = Math.max(1, Math.floor(pRef.current.attack / 2));
             if (relic?.id === 'collar') petAtk += 10;
             e.hp -= petAtk; if (e.hp < 0) e.hp = 0;
-            addLog(`${t.combat_pet} causou ${petAtk} de dano`, 'pet');
+            addLog(`Mascote atacou causando ${petAtk} de dano`, 'pet');
             setCurrentEStats({ ...e });
-            await new Promise(r => setTimeout(r, 350)); // Velocidade rítmica
+            await new Promise(r => setTimeout(r, 600)); 
             setIsTakingDamage(null);
             if (e.hp <= 0) { setIsDone(true); return; }
         }
@@ -79,7 +79,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             if (pRef.current.hp <= 0 || e.hp <= 0) return;
             
             if (side === 'player' && altarEffect?.id === 'short_breath' && lastPlayerAttackTurn === turnCount - 1) {
-                addLog(`Recuperando o fôlego...`, 'info');
+                addLog(`Você recupera o fôlego...`, 'info');
                 return;
             }
             if (side === 'player' && altarEffect?.id === 'trembling_hands' && Math.random() < 0.25) {
@@ -96,7 +96,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
                 }
                 if (relic?.id === 'crit' && Math.random() < 0.05) {
                     atkValue *= 2;
-                    addLog(`CRÍTICO!`, 'player');
+                    addLog(`GOLPE CRÍTICO!`, 'player');
                 }
                 if (altarEffect?.id === 'contained_fury' && pRef.current.hp < (pRef.current.maxHp / 2)) {
                     atkValue = Math.floor(atkValue * 1.15);
@@ -123,10 +123,11 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             if (defender.hp < 0) defender.hp = 0;
             if (side === 'player') lastPlayerAttackTurn = turnCount;
 
-            addLog(`${side === 'player' ? t.combat_player : t.combat_enemy} causou ${originalAtk} de dano`, side === 'player' ? 'player' : 'enemy');
+            const msg = side === 'player' ? `Você atacou o inimigo causando ${originalAtk} de dano` : `O inimigo atacou causando ${originalAtk} de dano`;
+            addLog(msg, side === 'player' ? 'player' : 'enemy');
             setCurrentPStats({ ...pRef.current }); setCurrentEStats({ ...e }); 
 
-            await new Promise(r => setTimeout(r, 450)); 
+            await new Promise(r => setTimeout(r, 650)); 
             setIsTakingDamage(null);
         };
 
@@ -134,21 +135,22 @@ export const CombatModal: React.FC<CombatModalProps> = ({
         if (pRef.current.hp > 0 && e.hp > 0) {
             await new Promise(r => setTimeout(r, 200)); 
             await processSide(turnOrder[1] as any);
-            if (pRef.current.hp > 0 && e.hp > 0) setTimeout(resolveTurn, 350);
+            if (pRef.current.hp > 0 && e.hp > 0) setTimeout(resolveTurn, 500);
             else setIsDone(true);
         } else { setIsDone(true); }
       };
       executeSequence();
     };
-    setTimeout(resolveTurn, 500);
+    setTimeout(resolveTurn, 600);
   }, []);
 
   const handleUsePotion = (idx: number) => {
     if (isDone) return;
-    const pot = inventory[idx];
+    const pot = inventory![idx];
+    const potName = pot.percent <= 25 ? 'Poção Pequena' : pot.percent <= 50 ? 'Poção Média' : 'Poção Grande';
     if (onUsePotion(idx)) { 
       setCurrentPStats({ ...pRef.current }); 
-      addLog(`Você usou poção e recuperou ${pot.percent}% de vida`, 'player'); 
+      addLog(`Você usou uma ${potName} e recuperou ${pot.percent}% da Vida`, 'player'); 
     }
   };
 
@@ -156,28 +158,26 @@ export const CombatModal: React.FC<CombatModalProps> = ({
     <div className="fixed inset-0 bg-black/98 flex items-center justify-center z-50 p-4 backdrop-blur-xl">
       <div className="bg-[#0a0a0a] border border-[#222] max-w-lg w-full p-6 rounded-[2.5rem] shadow-2xl flex flex-col gap-6">
         
-        {/* Personagens */}
         <div className="flex gap-4 items-stretch">
-          <div className={`flex-1 flex flex-col items-center gap-4 p-5 rounded-[1.5rem] bg-[#111] border border-[#333] ${isTakingDamage === 'player' ? 'animate-shake border-red-900 bg-red-950/10' : ''}`}>
-             <div className="flex items-center justify-center gap-3">
-                <div className="flex flex-col items-center">
-                   <span className="text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.4)]"><Icon.Player width={36} height={36} /></span>
-                </div>
+          <div className={`flex-1 flex flex-col items-center gap-4 p-5 rounded-[1.5rem] bg-[#111] border border-[#333] transition-all ${isTakingDamage === 'player' ? 'animate-shake border-red-900' : ''}`}>
+             <div className="flex items-center justify-center gap-4">
+                <span className="text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.4)]"><Icon.Player width={40} height={40} /></span>
                 {activePet && petHp > 0 && (
-                   <div className="flex flex-col items-center border-l border-[#333] pl-3">
-                      <span className="text-orange-500 animate-pet-wiggle"><Icon.Wolf width={28} height={28} /></span>
+                   <div className="flex flex-col items-center border-l border-[#333] pl-4">
+                      <span className="text-orange-500 animate-pet-wiggle"><Icon.Wolf width={30} height={30} /></span>
                    </div>
                 )}
              </div>
              <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-[#222]">
                 <div className="h-full bg-red-600 transition-all duration-500" style={{ width: `${(currentPStats.hp / currentPStats.maxHp) * 100}%` }} />
              </div>
-             <span className="text-[12px] font-black text-white tracking-widest">{currentPStats.hp} HP</span>
           </div>
 
-          <div className={`flex-1 flex flex-col items-center gap-4 p-5 rounded-[1.5rem] bg-[#111] border border-[#333] ${isTakingDamage === 'enemy' ? 'animate-shake border-red-900 bg-red-950/10' : ''}`}>
+          <div className="flex items-center justify-center opacity-20"><span className="text-zinc-600 text-xl font-black">VS</span></div>
+
+          <div className={`flex-1 flex flex-col items-center gap-4 p-5 rounded-[1.5rem] bg-[#111] border border-[#333] transition-all ${isTakingDamage === 'enemy' ? 'animate-shake border-red-900' : ''}`}>
              <span className={enemy.isBoss ? 'text-red-600' : 'text-zinc-500'}>
-                <Icon.Enemy isBoss={enemy.isBoss} width={36} height={36} />
+                <Icon.Enemy isBoss={enemy.isBoss} width={40} height={40} />
              </span>
              <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-[#222]">
                 <div className="h-full bg-zinc-700 transition-all duration-500" style={{ width: `${(currentEStats.hp / currentEStats.maxHp) * 100}%` }} />
@@ -186,45 +186,40 @@ export const CombatModal: React.FC<CombatModalProps> = ({
           </div>
         </div>
 
-        {/* Logs Coloridos */}
-        <div className="bg-[#050505] border border-[#222] rounded-2xl p-4 h-40 overflow-hidden shadow-inner">
+        <div className="bg-[#050505] border border-[#222] rounded-2xl p-5 h-44 overflow-hidden shadow-inner flex flex-col">
+          <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-2 border-b border-[#111] pb-1">Histórico de Combate</p>
           <div ref={scrollRef} className="overflow-y-auto h-full space-y-2 no-scrollbar font-mono">
             {combatLogs.map((log, i) => (
-              <p key={i} className={`text-[11px] leading-tight ${
+              <p key={i} className={`text-[11px] leading-tight font-bold ${
                 log.type === 'player' ? 'text-cyan-400' : 
                 log.type === 'enemy' ? 'text-red-400' : 
                 log.type === 'pet' ? 'text-orange-400' : 'text-zinc-600'
               }`}>
-                <span className="opacity-30 mr-2">[{i + 1}]</span>
                 {log.msg}
               </p>
             ))}
           </div>
         </div>
 
-        {/* Ações / Inventário com nomes das poções */}
-        {!isDone && inventory.length > 0 && (
+        {!isDone && inventory && inventory.length > 0 && (
           <div className="flex justify-center flex-wrap gap-2 p-3 bg-[#111] rounded-2xl border border-[#222]">
-            {inventory.map((pot, i) => (
-              <button 
-                key={i} 
-                onClick={() => handleUsePotion(i)} 
-                className="flex items-center gap-2 px-3 py-2 bg-pink-950/10 border border-pink-500/20 rounded-xl text-pink-500 hover:bg-pink-900/20 active:scale-95 transition-all group"
-              >
-                <Icon.Potion width={16} height={16} />
-                <span className="text-[9px] font-black uppercase whitespace-nowrap">
-                  {pot.percent <= 25 ? 'Pequena' : pot.percent <= 50 ? 'Média' : 'Grande'} ({pot.percent}%)
-                </span>
-              </button>
-            ))}
+            {inventory.map((pot, i) => {
+               const potName = pot.percent <= 25 ? 'Poção Pequena' : pot.percent <= 50 ? 'Poção Média' : 'Poção Grande';
+               return (
+                <button key={i} onClick={() => handleUsePotion(i)} className="flex items-center gap-2 px-4 py-2 bg-pink-950/10 border border-pink-500/20 rounded-xl text-pink-500 hover:bg-pink-900/20 active:scale-95 transition-all group overflow-hidden">
+                  <Icon.Potion width={14} height={14} />
+                  <div className="flex flex-col items-start leading-none">
+                    <span className="text-[9px] font-black uppercase whitespace-nowrap">{potName}</span>
+                    <span className="text-[7px] font-bold opacity-60">Regenera {pot.percent}%</span>
+                  </div>
+                </button>
+               )
+            })}
           </div>
         )}
 
         {isDone && (
-          <button 
-            onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 10) + 10, petHp)} 
-            className={`w-full font-black py-5 rounded-2xl uppercase text-[12px] tracking-[0.2em] transition-all transform active:scale-95 shadow-2xl ${currentPStats.hp > 0 ? "bg-[#16a34a] text-white hover:bg-[#15803d]" : "bg-red-800 text-white hover:bg-red-700"}`}
-          >
+          <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 10) + 10, petHp)} className={`w-full font-black py-5 rounded-2xl uppercase text-[12px] tracking-[0.2em] transition-all transform active:scale-95 shadow-2xl ${currentPStats.hp > 0 ? "bg-[#16a34a] text-white hover:bg-[#15803d]" : "bg-red-800 text-white hover:bg-red-700"}`}>
             {currentPStats.hp > 0 ? t.collect_reward : t.succumb}
           </button>
         )}
@@ -297,7 +292,7 @@ export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
 
           {!hasPet && (
             <div className="space-y-3">
-               <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest text-center border-b border-orange-900/20 pb-1">Companheiros</p>
+               <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest text-center border-b border-orange-900/20 pb-1">Companheiros (10 G)</p>
                <div className="grid grid-cols-3 gap-3">
                   {(['LOBO', 'PUMA', 'CORVO'] as Pet['type'][]).map(type => (
                     <button key={type} onClick={() => onBuyPet(type)} disabled={gold < 10} className="flex flex-col items-center gap-2 p-3 bg-orange-900/5 rounded-2xl border border-[#333] hover:border-orange-500 disabled:opacity-30">
@@ -399,7 +394,7 @@ export const RelicSelectionModal: React.FC<RelicSelectionModalProps> = ({ option
         <h2 className="text-4xl font-black text-purple-500 tracking-tighter uppercase leading-none">{t.relic_choice}</h2>
         <p className="text-zinc-600 font-bold text-[10px] uppercase tracking-[0.3em]">Escolha o seu legado eterno</p>
       </div>
-      <div className="grid grid-cols-1 gap-4 w-full max-sm">
+      <div className="grid grid-cols-1 gap-4 w-full max-w-sm">
         {options.map(relic => (
           <button key={relic.id} onClick={() => onSelect(relic)} className="p-6 bg-[#111] border border-[#222] rounded-[2.5rem] text-left hover:border-purple-500/50 flex items-center gap-6 transition-all active:scale-95 group">
             <div className="text-purple-500 group-hover:scale-110 transition-transform">{React.createElement((Icon as any)[relic.icon], { width: 32, height: 32 })}</div>
