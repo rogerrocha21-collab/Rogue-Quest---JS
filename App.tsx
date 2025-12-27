@@ -132,10 +132,6 @@ const App: React.FC = () => {
         if (activeRelic?.id === 'gaze') startInventory.push({ id: 'relic-potion', percent: 70, x: 0, y: 0 });
         if (activeRelic?.id === 'mark') { currentGold += 60; currentStats.maxHp = Math.floor(currentStats.maxHp * 0.9); currentStats.hp = currentStats.maxHp; }
         if (activeRelic?.id === 'heart') { currentStats.attack = Math.floor(currentStats.attack * 1.1); currentStats.maxHp = Math.floor(currentStats.maxHp * 0.95); currentStats.hp = Math.min(currentStats.hp, currentStats.maxHp); }
-        if (activeRelic?.id === 'echo' && stats) {
-           // echo already accounted if stats were passed, but in fresh start we can't 'inherit' without external state.
-           // assumed stats passed here are the inherited ones from last run death.
-        }
     } else {
         if (activeRelic?.id === 'slots') invSize = 10;
     }
@@ -174,7 +170,6 @@ const App: React.FC = () => {
         if (enemy) { 
           setMoveQueue([]); 
           if (prev.tronModeActive) {
-            // Trample effect
             playAttackSound('player');
             const goldTrample = Math.floor(Math.random() * 21) + 10;
             return { 
@@ -284,7 +279,6 @@ const App: React.FC = () => {
       const heal = Math.floor(stats.maxHp * (boost / 100));
       stats.hp = Math.min(stats.maxHp, stats.hp + heal);
       const newInv = [...prev.inventory];
-      
       if (prev.activeAltarEffect?.id !== 'accepted_offering') {
         newInv.splice(idx, 1);
       }
@@ -300,9 +294,9 @@ const App: React.FC = () => {
     const level = gameState?.level || 1;
     const atk = gameState?.playerStats.attack || 0;
     const armor = gameState?.playerStats.maxArmor || 0;
-    
     const shareText = `🎮 ROGUEQUEST: O Despertar\n🏆 Herói: ${heroName}\n📍 Nível Alcançado: ${level}\n⚔️ Ataque: ${atk}\n🛡️ Escudo: ${armor}\n\nDesafie o abismo você também! #RogueQuest\n${window.location.href}`;
     
+    // Método robusto para cópia manual para área de transferência
     const copyFallback = (text: string) => {
       const textArea = document.createElement("textarea");
       textArea.value = text;
@@ -455,15 +449,7 @@ const App: React.FC = () => {
                  newInventory.push({ id: `chest-pot-${Date.now()}`, percent, x: 0, y: 0 });
                }
             }
-
-            return { 
-              ...prev, 
-              playerStats: stats, 
-              gold: prev.gold + goldToAdd,
-              inventory: newInventory,
-              gameStatus: 'PLAYING' as const, 
-              activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect 
-            } as GameState;
+            return { ...prev, playerStats: stats, gold: prev.gold + goldToAdd, inventory: newInventory, gameStatus: 'PLAYING' as const, activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect } as GameState;
           });
       }} />}
       {gameState.gameStatus === 'MERCHANT_SHOP' && <MerchantShopModal gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} language={currentLang} activeAltarEffect={gameState.activeAltarEffect} onBuyItem={(item) => {
@@ -484,7 +470,6 @@ const App: React.FC = () => {
             setGameState({ ...gameState!, gold: gameState!.gold - pot.price!, inventory: [...gameState!.inventory, pot] });
           }
       }} onRentTron={() => setGameState(prev => prev ? { ...prev, gold: prev.gold - 25, tronModeActive: true, tronTimeLeft: 15, gameStatus: 'PLAYING' as const } as GameState : null)} onBuyPet={(type) => {
-          const price = type === 'CORVO' || type === 'LOBO' || type === 'PUMA' ? 10 : 15; // Placeholder
           const pet: Pet = { type, name: type, hp: 50, maxHp: 50, pos: { ...playerPosRef.current } };
           setGameState(prev => prev ? { ...prev, gold: prev.gold - 10, activePet: pet } as GameState : null);
       }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)} />}

@@ -55,15 +55,13 @@ export const CombatModal: React.FC<CombatModalProps> = ({
       if (pRef.current.hp <= 0 || e.hp <= 0) { setIsDone(true); return; }
       const executeSequence = async () => {
         turnCount++;
-        
         const enemyHasInitiative = altarEffect?.id === 'slow_reflexes';
 
         if (!enemyHasInitiative && activePet && curPetHp > 0) {
-            if (onAttackSound) onAttackSound('player');
             let petAtk = Math.max(1, Math.floor(pRef.current.attack / 2));
             if (relic?.id === 'collar') petAtk += 10;
             e.hp -= petAtk; if (e.hp < 0) e.hp = 0;
-            addLog(`Mascote atacou causando ${petAtk} de dano`, 'pet');
+            addLog(`${t.combat_pet} atacou causando ${petAtk} de dano`, 'pet');
             setCurrentEStats({ ...e });
             setIsTakingDamage('enemy');
             await new Promise(r => setTimeout(r, 600)); 
@@ -76,7 +74,6 @@ export const CombatModal: React.FC<CombatModalProps> = ({
 
         const processSide = async (side: 'player' | 'enemy') => {
             if (pRef.current.hp <= 0 || e.hp <= 0) return;
-            
             if (side === 'player' && altarEffect?.id === 'short_breath' && lastPlayerAttackTurn === turnCount - 1) {
                 addLog(`Você recupera o fôlego...`, 'info');
                 return;
@@ -87,7 +84,6 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             }
 
             let atkValue = side === 'player' ? pRef.current.attack : e.attack;
-            
             if (side === 'player') {
                 if (altarEffect?.id === 'anxious_strike' && isFirstPlayerHitInCombat) {
                     atkValue *= 2;
@@ -106,7 +102,6 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             if (onAttackSound) onAttackSound(side);
             let defender = side === 'player' ? e : pRef.current;
             let originalAtk = atkValue;
-            
             if (side === 'enemy' && altarEffect?.id === 'fragile_blood') originalAtk = Math.floor(originalAtk * 1.1);
             if (side === 'enemy' && relic?.id === 'defense') originalAtk = Math.max(1, originalAtk - 10);
 
@@ -120,19 +115,18 @@ export const CombatModal: React.FC<CombatModalProps> = ({
               if (side === 'player') e.armor = Math.max(0, e.armor - absorbed);
               else pRef.current.armor = Math.max(0, pRef.current.armor - absorbed);
               currentAtkForCalculation -= absorbed;
-              addLog(`${side === 'player' ? 'Inimigo' : 'Você'} absorveu ${absorbed} de dano`, 'info');
+              addLog(`${side === 'player' ? t.combat_enemy : t.combat_player} ${t.combat_absorbed} ${absorbed} de dano`, 'info');
             }
 
             if (currentAtkForCalculation > 0) defender.hp -= currentAtkForCalculation;
             if (defender.hp < 0) defender.hp = 0;
-            
             if (side === 'enemy' && altarEffect?.id === 'mark_of_prey') {
                 pRef.current.hp = Math.max(1, pRef.current.hp - 2);
                 addLog(`Você está sangrando! (-2 HP)`, 'enemy');
             }
 
             if (side === 'player') lastPlayerAttackTurn = turnCount;
-            const msg = side === 'player' ? `Você atacou o inimigo causando ${originalAtk} de dano` : `O inimigo atacou causando ${originalAtk} de dano`;
+            const msg = side === 'player' ? `${t.combat_player} atacou o inimigo causando ${originalAtk} de dano` : `O inimigo atacou causando ${originalAtk} de dano`;
             addLog(msg, side === 'player' ? 'player' : 'enemy');
             setCurrentPStats({ ...pRef.current }); setCurrentEStats({ ...e }); 
             setIsTakingDamage(side === 'player' ? 'enemy' : 'player');
@@ -148,7 +142,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
                  let petAtk = Math.max(1, Math.floor(pRef.current.attack / 2));
                  if (relic?.id === 'collar') petAtk += 10;
                  e.hp -= petAtk; if (e.hp < 0) e.hp = 0;
-                 addLog(`Mascote contra-atacou causando ${petAtk} de dano`, 'pet');
+                 addLog(`${t.combat_pet} contra-atacou causando ${petAtk} de dano`, 'pet');
                  setCurrentEStats({ ...e });
                  setIsTakingDamage('enemy');
                  await new Promise(r => setTimeout(r, 600)); 
@@ -161,7 +155,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
       executeSequence();
     };
     setTimeout(resolveTurn, 600);
-  }, []);
+  }, [t]);
 
   const handleUsePotion = (idx: number) => {
     if (isDone) return;
@@ -174,7 +168,6 @@ export const CombatModal: React.FC<CombatModalProps> = ({
       stats.hp = Math.min(stats.maxHp, stats.hp + heal);
       pRef.current = stats;
       setCurrentPStats({ ...stats }); 
-      
       addLog(`Você usou uma ${potName} e recuperou ${pot.percent}% da Vida`, 'heal'); 
       setIsHealAnim(true);
       setTimeout(() => setIsHealAnim(false), 1200);
@@ -215,7 +208,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
           <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-2 border-b border-[#111] pb-1">Histórico de Combate</p>
           <div ref={scrollRef} className="overflow-y-auto h-full space-y-2 no-scrollbar font-mono">
             {combatLogs.map((log, i) => (
-              <p key={i} className={`text-[11px] leading-tight font-bold ${log.type === 'player' ? 'text-zinc-400' : log.type === 'enemy' ? 'text-red-500' : log.type === 'pet' ? 'text-orange-400' : log.type === 'heal' ? 'text-green-400 animate-pulse' : 'text-yellow-600'}`}>
+              <p key={i} className={`text-[11px] leading-tight font-bold ${log.type === 'player' ? 'text-zinc-400' : log.type === 'enemy' ? 'text-red-500' : log.type === 'pet' ? 'text-purple-500' : log.type === 'heal' ? 'text-green-400 animate-pulse' : 'text-yellow-600'}`}>
                 {log.msg}
               </p>
             ))}
