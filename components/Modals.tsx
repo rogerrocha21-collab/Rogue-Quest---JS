@@ -6,7 +6,7 @@ import { ITEM_POOL, TRANSLATIONS, RELICS_POOL } from '../constants';
 
 interface CombatLogEntry {
   msg: string;
-  type: 'player' | 'enemy' | 'pet' | 'info';
+  type: 'player' | 'enemy' | 'pet' | 'info' | 'heal';
 }
 
 interface CombatModalProps {
@@ -29,14 +29,14 @@ export const CombatModal: React.FC<CombatModalProps> = ({
   const [currentEStats, setCurrentEStats] = useState({ ...enemy.stats });
   const [petHp, setPetHp] = useState(activePet?.hp || 0);
   const [isDone, setIsDone] = useState(false);
-  const [lastAttacker, setLastAttacker] = useState<'player' | 'enemy' | 'pet' | null>(null);
+  const [isHealAnim, setIsHealAnim] = useState(false);
   const [isTakingDamage, setIsTakingDamage] = useState<'player' | 'enemy' | 'pet' | null>(null);
   const [combatLogs, setCombatLogs] = useState<CombatLogEntry[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pRef = useRef({ ...playerStats }); 
   const t = TRANSLATIONS[language];
 
-  const addLog = (msg: string, type: 'player' | 'enemy' | 'pet' | 'info') => { 
+  const addLog = (msg: string, type: 'player' | 'enemy' | 'pet' | 'info' | 'heal') => { 
     setCombatLogs(prev => [...prev, { msg, type }]); 
   };
 
@@ -56,18 +56,16 @@ export const CombatModal: React.FC<CombatModalProps> = ({
       const executeSequence = async () => {
         turnCount++;
         
-        // Maldição Reflexos Lentos: Inimigo ataca PRIMEIRO, ignorando pet e speed
         const enemyHasInitiative = altarEffect?.id === 'slow_reflexes';
 
         if (!enemyHasInitiative && activePet && curPetHp > 0) {
-            setLastAttacker('pet'); 
-            setIsTakingDamage('enemy');
             if (onAttackSound) onAttackSound('player');
             let petAtk = Math.max(1, Math.floor(pRef.current.attack / 2));
             if (relic?.id === 'collar') petAtk += 10;
             e.hp -= petAtk; if (e.hp < 0) e.hp = 0;
             addLog(`Mascote atacou causando ${petAtk} de dano`, 'pet');
             setCurrentEStats({ ...e });
+            setIsTakingDamage('enemy');
             await new Promise(r => setTimeout(r, 600)); 
             setIsTakingDamage(null);
             if (e.hp <= 0) { setIsDone(true); return; }
@@ -79,13 +77,10 @@ export const CombatModal: React.FC<CombatModalProps> = ({
         const processSide = async (side: 'player' | 'enemy') => {
             if (pRef.current.hp <= 0 || e.hp <= 0) return;
             
-            // Maldição Fôlego Curto
             if (side === 'player' && altarEffect?.id === 'short_breath' && lastPlayerAttackTurn === turnCount - 1) {
                 addLog(`Você recupera o fôlego...`, 'info');
                 return;
             }
-            
-            // Maldição Mãos Trêmulas
             if (side === 'player' && altarEffect?.id === 'trembling_hands' && Math.random() < 0.25) {
                 addLog(`Você errou o ataque!`, 'player');
                 return;
@@ -94,97 +89,71 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             let atkValue = side === 'player' ? pRef.current.attack : e.attack;
             
             if (side === 'player') {
-                // Relíquia Power
-                if (relic?.id === 'power' && isFirstPlayerHitInCombat) {
-                    atkValue = Math.floor(atkValue * 1.1);
-                }
-                
-                // Benção Golpe Ansioso (Dano Dobrado)
                 if (altarEffect?.id === 'anxious_strike' && isFirstPlayerHitInCombat) {
                     atkValue *= 2;
                     addLog(`GOLPE ANSIOSO!`, 'player');
                 }
-
-                // Relíquia Crit
-                if (relic?.id === 'crit' && Math.random() < 0.05) {
-                    atkValue *= 2;
-                    addLog(`GOLPE CRÍTICO!`, 'player');
-                }
-                
-                // Benção Fúria Contida
                 if (altarEffect?.id === 'contained_fury' && pRef.current.hp < (pRef.current.maxHp / 2)) {
                     atkValue = Math.floor(atkValue * 1.15);
                 }
-
+                if (relic?.id === 'crit' && Math.random() < 0.05) {
+                   atkValue = Math.floor(atkValue * 2);
+                   addLog(`CRÍTICO!`, 'player');
+                }
                 isFirstPlayerHitInCombat = false;
             }
 
-            setLastAttacker(side); setIsTakingDamage(side === 'player' ? 'enemy' : 'player');
             if (onAttackSound) onAttackSound(side);
-            
             let defender = side === 'player' ? e : pRef.current;
             let originalAtk = atkValue;
             
-            // Relíquia Defesa
-            if (side === 'enemy' && relic?.id === 'defense') originalAtk = Math.max(1, originalAtk - 1);
-            
-            // Maldição Sangue Frágil (+10% dano recebido)
             if (side === 'enemy' && altarEffect?.id === 'fragile_blood') originalAtk = Math.floor(originalAtk * 1.1);
+            if (side === 'enemy' && relic?.id === 'defense') originalAtk = Math.max(1, originalAtk - 10);
 
             let currentAtkForCalculation = originalAtk;
-            
-            // Benção Punhos Consagrados (Ignora parte da defesa)
             const armorToConsider = (side === 'player' && altarEffect?.id === 'consecrated_fists') 
                 ? Math.floor(defender.armor / 2) 
                 : defender.armor;
 
             if (armorToConsider > 0) {
               let absorbed = Math.min(armorToConsider, currentAtkForCalculation);
-              if (side === 'player') {
-                e.armor = Math.max(0, e.armor - absorbed);
-              } else {
-                pRef.current.armor = Math.max(0, pRef.current.armor - absorbed);
-              }
+              if (side === 'player') e.armor = Math.max(0, e.armor - absorbed);
+              else pRef.current.armor = Math.max(0, pRef.current.armor - absorbed);
               currentAtkForCalculation -= absorbed;
+              addLog(`${side === 'player' ? 'Inimigo' : 'Você'} absorveu ${absorbed} de dano`, 'info');
             }
 
             if (currentAtkForCalculation > 0) defender.hp -= currentAtkForCalculation;
             if (defender.hp < 0) defender.hp = 0;
             
-            // Maldição Marca da Presa (Sangramento)
             if (side === 'enemy' && altarEffect?.id === 'mark_of_prey') {
                 pRef.current.hp = Math.max(1, pRef.current.hp - 2);
                 addLog(`Você está sangrando! (-2 HP)`, 'enemy');
             }
 
             if (side === 'player') lastPlayerAttackTurn = turnCount;
-
             const msg = side === 'player' ? `Você atacou o inimigo causando ${originalAtk} de dano` : `O inimigo atacou causando ${originalAtk} de dano`;
             addLog(msg, side === 'player' ? 'player' : 'enemy');
             setCurrentPStats({ ...pRef.current }); setCurrentEStats({ ...e }); 
-
+            setIsTakingDamage(side === 'player' ? 'enemy' : 'player');
             await new Promise(r => setTimeout(r, 650)); 
             setIsTakingDamage(null);
         };
 
-        // Ordem do turno considerando a iniciativa do inimigo
         await processSide(turnOrder[0] as any);
         if (pRef.current.hp > 0 && e.hp > 0) {
             await new Promise(r => setTimeout(r, 200)); 
             await processSide(turnOrder[1] as any);
-            
-            // Se o inimigo teve iniciativa, o pet ataca agora no final
             if (enemyHasInitiative && activePet && curPetHp > 0 && pRef.current.hp > 0 && e.hp > 0) {
-                 setLastAttacker('pet'); 
-                 setIsTakingDamage('enemy');
                  let petAtk = Math.max(1, Math.floor(pRef.current.attack / 2));
+                 if (relic?.id === 'collar') petAtk += 10;
                  e.hp -= petAtk; if (e.hp < 0) e.hp = 0;
                  addLog(`Mascote contra-atacou causando ${petAtk} de dano`, 'pet');
                  setCurrentEStats({ ...e });
+                 setIsTakingDamage('enemy');
                  await new Promise(r => setTimeout(r, 600)); 
                  setIsTakingDamage(null);
             }
-
             if (pRef.current.hp > 0 && e.hp > 0) setTimeout(resolveTurn, 500);
             else setIsDone(true);
         } else { setIsDone(true); }
@@ -199,32 +168,39 @@ export const CombatModal: React.FC<CombatModalProps> = ({
     const pot = inventory![idx];
     const potName = pot.percent <= 25 ? 'Poção Pequena' : pot.percent <= 50 ? 'Poção Média' : 'Poção Grande';
     if (onUsePotion(idx)) { 
-      setCurrentPStats({ ...pRef.current }); 
-      addLog(`Você usou uma ${potName} e recuperou ${pot.percent}% da Vida`, 'player'); 
+      const stats = { ...pRef.current };
+      const boost = pot.percent;
+      const heal = Math.floor(stats.maxHp * (boost / 100));
+      stats.hp = Math.min(stats.maxHp, stats.hp + heal);
+      pRef.current = stats;
+      setCurrentPStats({ ...stats }); 
+      
+      addLog(`Você usou uma ${potName} e recuperou ${pot.percent}% da Vida`, 'heal'); 
+      setIsHealAnim(true);
+      setTimeout(() => setIsHealAnim(false), 1200);
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/98 flex items-center justify-center z-50 p-4 backdrop-blur-xl">
       <div className="bg-[#0a0a0a] border border-[#222] max-w-lg w-full p-6 rounded-[2.5rem] shadow-2xl flex flex-col gap-6">
-        
         <div className="flex gap-4 items-stretch">
-          <div className={`flex-1 flex flex-col items-center gap-4 p-5 rounded-[1.5rem] bg-[#111] border border-[#333] transition-all ${isTakingDamage === 'player' ? 'animate-shake border-red-900' : ''}`}>
+          <div className={`flex-1 flex flex-col items-center gap-4 p-5 rounded-[1.5rem] bg-[#111] border border-[#333] transition-all relative overflow-hidden ${isTakingDamage === 'player' ? 'animate-shake border-red-900' : ''} ${isHealAnim ? 'ring-4 ring-green-500/50 scale-105' : ''}`}>
+             {isHealAnim && <div className="absolute inset-0 bg-green-500/10 animate-pulse pointer-events-none" />}
              <div className="flex items-center justify-center gap-4">
-                <span className="text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.4)]"><Icon.Player width={40} height={40} /></span>
+                <span className={`text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.4)] ${isHealAnim ? 'text-green-400' : ''}`}><Icon.Player width={40} height={40} /></span>
                 {activePet && petHp > 0 && (
                    <div className="flex flex-col items-center border-l border-[#333] pl-4">
-                      <span className="text-orange-500 animate-pet-wiggle"><Icon.Wolf width={30} height={30} /></span>
+                      <span className="text-orange-400 animate-pet-wiggle"><Icon.Wolf width={30} height={30} /></span>
                    </div>
                 )}
              </div>
              <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-[#222]">
-                <div className="h-full bg-red-600 transition-all duration-500" style={{ width: `${(currentPStats.hp / currentPStats.maxHp) * 100}%` }} />
+                <div className={`h-full transition-all duration-[1000ms] ${isHealAnim ? 'bg-green-500' : 'bg-red-600'}`} style={{ width: `${(currentPStats.hp / currentPStats.maxHp) * 100}%` }} />
              </div>
+             <span className={`text-[10px] font-black uppercase ${isHealAnim ? 'text-green-400 animate-bounce' : 'text-zinc-500'}`}>{currentPStats.hp} / {currentPStats.maxHp} HP</span>
           </div>
-
           <div className="flex items-center justify-center opacity-20"><span className="text-zinc-600 text-xl font-black">VS</span></div>
-
           <div className={`flex-1 flex flex-col items-center gap-4 p-5 rounded-[1.5rem] bg-[#111] border border-[#333] transition-all ${isTakingDamage === 'enemy' ? 'animate-shake border-red-900' : ''}`}>
              <span className={enemy.isBoss ? 'text-red-600' : 'text-zinc-500'}>
                 <Icon.Enemy isBoss={enemy.isBoss} width={40} height={40} />
@@ -235,23 +211,16 @@ export const CombatModal: React.FC<CombatModalProps> = ({
              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none">{enemy.type}</span>
           </div>
         </div>
-
         <div className="bg-[#050505] border border-[#222] rounded-2xl p-5 h-44 overflow-hidden shadow-inner flex flex-col">
           <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-2 border-b border-[#111] pb-1">Histórico de Combate</p>
           <div ref={scrollRef} className="overflow-y-auto h-full space-y-2 no-scrollbar font-mono">
             {combatLogs.map((log, i) => (
-              <p key={i} className={`text-[11px] leading-tight font-bold ${
-                log.type === 'player' ? 'text-cyan-400' : 
-                log.type === 'enemy' ? 'text-red-400' : 
-                log.type === 'pet' ? 'text-orange-400' : 
-                log.type === 'info' ? 'text-yellow-600' : 'text-zinc-600'
-              }`}>
+              <p key={i} className={`text-[11px] leading-tight font-bold ${log.type === 'player' ? 'text-zinc-400' : log.type === 'enemy' ? 'text-red-500' : log.type === 'pet' ? 'text-orange-400' : log.type === 'heal' ? 'text-green-400 animate-pulse' : 'text-yellow-600'}`}>
                 {log.msg}
               </p>
             ))}
           </div>
         </div>
-
         {!isDone && inventory && inventory.length > 0 && (
           <div className="flex justify-center flex-wrap gap-2 p-3 bg-[#111] rounded-2xl border border-[#222]">
             {inventory.map((pot, i) => {
@@ -268,9 +237,8 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             })}
           </div>
         )}
-
         {isDone && (
-          <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 10) + 10, petHp)} className={`w-full font-black py-5 rounded-2xl uppercase text-[12px] tracking-[0.2em] transition-all transform active:scale-95 shadow-2xl ${currentPStats.hp > 0 ? "bg-[#16a34a] text-white hover:bg-[#15803d]" : "bg-red-800 text-white hover:bg-red-700"}`}>
+          <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 21) + 10, petHp)} className={`w-full font-black py-5 rounded-2xl uppercase text-[12px] tracking-[0.2em] transition-all transform active:scale-95 shadow-2xl ${currentPStats.hp > 0 ? "bg-[#16a34a] text-white hover:bg-[#15803d]" : "bg-red-800 text-white hover:bg-red-700"}`}>
             {currentPStats.hp > 0 ? t.collect_reward : t.succumb}
           </button>
         )}
@@ -278,6 +246,19 @@ export const CombatModal: React.FC<CombatModalProps> = ({
     </div>
   );
 };
+
+interface MerchantShopModalProps {
+  gold: number;
+  level: number;
+  hasPet: boolean;
+  language?: Language;
+  onBuyItem: (item: ItemEntity) => void;
+  onBuyPotion: (pot: PotionEntity, choice: 'use' | 'store') => void;
+  onRentTron: () => void;
+  onBuyPet: (type: Pet['type']) => void;
+  onClose: () => void;
+  activeAltarEffect?: AltarEffect;
+}
 
 export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
   gold, level, hasPet, language = 'PT', onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose, activeAltarEffect
@@ -295,9 +276,9 @@ export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
   }, [level, priceMult]);
 
   const potions = useMemo(() => [
-    { id: 'p25', percent: 25, price: Math.floor(12 * priceMult) },
-    { id: 'p50', percent: 50, price: Math.floor(25 * priceMult) },
-    { id: 'p75', percent: 75, price: Math.floor(40 * priceMult) }
+    { id: 'p25', percent: 25, price: Math.floor(15 * priceMult) },
+    { id: 'p50', percent: 50, price: Math.floor(30 * priceMult) },
+    { id: 'p75', percent: 75, price: Math.floor(45 * priceMult) }
   ], [priceMult]);
 
   return (
@@ -308,12 +289,11 @@ export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
             <h2 className="text-xl font-black text-white uppercase tracking-tighter">{t.merchant_title}</h2>
             <div className="flex items-center gap-2 text-yellow-500 font-black text-[11px] mt-1">
               <Icon.Gold /> <span>{gold} MOEDAS</span>
-              {isMerchantBlessing && <span className="text-green-500 text-[8px] ml-2">(-20% OFF)</span>}
+              {isMerchantBlessing && <span className="text-green-500 text-[8px] ml-2 animate-pulse">(-20% OFF)</span>}
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white p-2"><Icon.VolumeX /></button>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white p-2">FECHAR</button>
         </div>
-
         <div className="flex-1 overflow-y-auto pr-2 space-y-5 no-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {shopItems.map(item => (
@@ -322,11 +302,11 @@ export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
                   {item.iconType === 'sword' ? <Icon.Sword width={20} height={20}/> : item.iconType === 'shield' ? <Icon.Shield width={20} height={20}/> : item.iconType === 'boot' ? <Icon.Boot width={20} height={20}/> : <Icon.Heart width={20} height={20}/>}
                 </div>
                 <p className="text-[10px] font-black text-zinc-100 uppercase leading-none">{item.name}</p>
+                <p className="text-[8px] text-indigo-400 font-bold mt-1 uppercase">+{item.value} {item.stat === 'attack' ? 'Ataque' : item.stat === 'maxArmor' ? 'Escudo' : item.stat === 'speed' ? 'Velocidade' : 'Vida'}</p>
                 <p className="text-[11px] text-yellow-500 font-black mt-2">{item.price} G</p>
               </button>
             ))}
           </div>
-
           <div className="space-y-3">
              <p className="text-[10px] font-black text-pink-500 uppercase tracking-widest text-center border-b border-pink-900/20 pb-1">Suprimentos</p>
              <div className="grid grid-cols-3 gap-3">
@@ -336,15 +316,14 @@ export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
                         <Icon.Potion width={14} height={14} /> <span className="ml-1">{p.percent}%</span>
                       </div>
                       <div className="flex flex-col gap-1.5 mt-1">
-                        <button onClick={() => onBuyPotion(p as any, 'use')} disabled={gold < p.price} className="w-full py-1.5 bg-pink-600/10 text-pink-500 text-[8px] font-black rounded border border-pink-500/20">USAR</button>
-                        <button onClick={() => onBuyPotion(p as any, 'store')} disabled={gold < p.price} className="w-full py-1.5 bg-zinc-800 text-zinc-400 text-[8px] font-black rounded">GUARDAR</button>
+                        <button onClick={() => onBuyPotion(p as any, 'use')} disabled={gold < p.price} className="w-full py-1.5 bg-pink-600/10 text-pink-500 text-[8px] font-black rounded border border-pink-500/20 uppercase">USAR</button>
+                        <button onClick={() => onBuyPotion(p as any, 'store')} disabled={gold < p.price} className="w-full py-1.5 bg-zinc-800 text-zinc-400 text-[8px] font-black rounded uppercase">GUARDAR</button>
                       </div>
                       <p className="text-[9px] text-center text-yellow-500 font-black mt-1">{p.price} G</p>
                    </div>
                 ))}
              </div>
           </div>
-
           {!hasPet && (
             <div className="space-y-3">
                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest text-center border-b border-orange-900/20 pb-1">Companheiros (10 G)</p>
@@ -358,7 +337,6 @@ export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
                </div>
             </div>
           )}
-
           <button disabled={gold < 25} onClick={onRentTron} className="w-full p-4 bg-cyan-950/10 border border-cyan-500/20 rounded-2xl flex items-center gap-4 hover:bg-cyan-900/10 transition-all disabled:opacity-30">
             <div className="text-cyan-500"><Icon.Horse width={24} height={24}/></div>
             <div className="flex-1 text-left">
@@ -368,14 +346,13 @@ export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
             <span className="text-[11px] text-yellow-500 font-black">25 G</span>
           </button>
         </div>
-
         <button onClick={onClose} className="w-full py-5 bg-white text-black font-black rounded-2xl uppercase text-[11px] tracking-[0.2em] flex-shrink-0 active:scale-95 transition-all">Fechar Negócio</button>
       </div>
     </div>
   );
 };
 
-export const TutorialModal: React.FC<TutorialModalProps> = ({ onFinish, language = 'PT' }) => {
+export const TutorialModal: React.FC<{ onFinish: () => void, language: Language }> = ({ onFinish, language }) => {
   const t = TRANSLATIONS[language];
   return (
     <div className="fixed inset-0 bg-black flex items-center justify-center z-[100] p-6 backdrop-blur-3xl">
@@ -403,7 +380,7 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ onFinish, language
   );
 };
 
-export const ChestModal: React.FC<ChestModalProps> = ({ onChoice, language = 'PT' }) => {
+export const ChestModal: React.FC<{ onChoice: (choice: StatChoice, extra: 'gold' | 'potion') => void, language: Language }> = ({ onChoice, language }) => {
   const t = TRANSLATIONS[language];
   return (
     <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-6 backdrop-blur-md">
@@ -412,7 +389,7 @@ export const ChestModal: React.FC<ChestModalProps> = ({ onChoice, language = 'PT
         <h2 className="text-2xl font-black text-white uppercase tracking-tighter">{t.chest_title}</h2>
         <div className="grid grid-cols-1 gap-3">
           {(['Ataque', 'Armadura', 'Velocidade'] as StatChoice[]).map(choice => (
-            <button key={choice} onClick={() => onChoice(choice)} className="py-5 bg-[#1a1a1a] hover:bg-[#222] rounded-2xl border border-[#333] transition-all active:scale-95 group">
+            <button key={choice} onClick={() => onChoice(choice, Math.random() > 0.5 ? 'gold' : 'potion')} className="py-5 bg-[#1a1a1a] hover:bg-[#222] rounded-2xl border border-[#333] transition-all active:scale-95 group">
               <span className="font-black text-[10px] uppercase tracking-[0.2em] text-white group-hover:text-blue-400">
                 {choice} {choice === 'Ataque' ? '+5' : choice === 'Armadura' ? '+3' : '+4'}
               </span>
@@ -424,7 +401,7 @@ export const ChestModal: React.FC<ChestModalProps> = ({ onChoice, language = 'PT
   );
 };
 
-export const PotionPickupModal: React.FC<PotionPickupModalProps> = ({ potion, language = 'PT', onChoice }) => {
+export const PotionPickupModal: React.FC<{ potion: PotionEntity, onChoice: (mode: 'use' | 'store') => void, language: Language }> = ({ potion, onChoice, language }) => {
   const t = TRANSLATIONS[language];
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6 backdrop-blur-sm">
@@ -441,7 +418,7 @@ export const PotionPickupModal: React.FC<PotionPickupModalProps> = ({ potion, la
   );
 };
 
-export const RelicSelectionModal: React.FC<RelicSelectionModalProps> = ({ options, language = 'PT', onSelect }) => {
+export const RelicSelectionModal: React.FC<{ options: Relic[], onSelect: (relic: Relic) => void, language: Language }> = ({ options, onSelect, language }) => {
   const t = TRANSLATIONS[language];
   return (
     <div className="fixed inset-0 bg-black z-[130] flex flex-col items-center justify-center p-6 space-y-10 animate-in fade-in">
@@ -464,7 +441,7 @@ export const RelicSelectionModal: React.FC<RelicSelectionModalProps> = ({ option
   );
 };
 
-export const AltarInteractionModal: React.FC<AltarInteractionModalProps> = ({ active, language = 'PT', onPray, onClose }) => {
+export const AltarInteractionModal: React.FC<{ active: boolean, onPray: () => void, onClose: () => void, language: Language }> = ({ active, onPray, onClose, language }) => {
   const t = TRANSLATIONS[language];
   return (
     <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-6 backdrop-blur-md">
@@ -483,7 +460,7 @@ export const AltarInteractionModal: React.FC<AltarInteractionModalProps> = ({ ac
   );
 };
 
-export const AltarResultModal: React.FC<AltarResultModalProps> = ({ effect, language = 'PT', onClose }) => {
+export const AltarResultModal: React.FC<{ effect: AltarEffect, onClose: () => void, language: Language }> = ({ effect, onClose, language }) => {
   const t = TRANSLATIONS[language];
   const isBlessing = effect.type === 'BLESSING';
   return (
@@ -499,23 +476,3 @@ export const AltarResultModal: React.FC<AltarResultModalProps> = ({ effect, lang
     </div>
   );
 };
-
-interface MerchantShopModalProps {
-  gold: number;
-  level: number;
-  hasPet: boolean;
-  language?: Language;
-  onBuyItem: (item: ItemEntity) => void;
-  onBuyPotion: (pot: PotionEntity, choice: 'use' | 'store') => void;
-  onRentTron: () => void;
-  onBuyPet: (type: Pet['type']) => void;
-  onClose: () => void;
-  activeAltarEffect?: AltarEffect;
-}
-
-interface TutorialModalProps { onFinish: () => void; language?: Language; }
-interface PotionPickupModalProps { potion: PotionEntity; language?: Language; onChoice: (choice: 'use' | 'store') => void; }
-interface RelicSelectionModalProps { options: Relic[]; language?: Language; onSelect: (relic: Relic) => void; }
-interface AltarInteractionModalProps { active: boolean; language?: Language; onPray: () => void; onClose: () => void; }
-interface AltarResultModalProps { effect: AltarEffect; language?: Language; onClose: () => void; }
-interface ChestModalProps { onChoice: (choice: StatChoice) => void; language?: Language; }

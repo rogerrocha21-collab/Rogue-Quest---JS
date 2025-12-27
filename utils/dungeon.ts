@@ -1,62 +1,36 @@
 
-import { MAP_WIDTH, MAP_HEIGHT, MAX_LEVELS, ENEMY_TYPES } from '../constants';
+import { MAP_WIDTH, MAP_HEIGHT, MAX_LEVELS, BIOME_ENEMIES } from '../constants';
 import { TileType, Enemy, Chest, EntityStats, PotionEntity, LevelTheme, Position } from '../types';
 
-const BIOME_ORDER: LevelTheme[] = [
+const BIOMES: LevelTheme[] = [
   'CAVE', 'FOREST', 'SNOW', 'DESERT', 'RUINS', 'CATACOMBS', 
   'OSSUARY', 'MECHANICAL', 'CORRUPTED', 'INFERNO', 'ASTRAL', 'MATRIX', 'VOID'
 ];
 
 export function generateDungeon(level: number) {
-  const currentWidth = Math.min(45 + Math.floor(level / 2), 85);
-  const currentHeight = Math.min(35 + Math.floor(level / 3), 55);
-  const targetEnemies = 10 + Math.floor(level / 2);
+  const currentWidth = Math.min(40 + Math.floor(level / 3), 90);
+  const currentHeight = Math.min(30 + Math.floor(level / 4), 58);
+  const targetEnemies = 8 + Math.floor(level / 1.5);
 
   const map: TileType[][] = Array(MAP_HEIGHT).fill(0).map(() => Array(MAP_WIDTH).fill('WALL'));
 
-  // Procedural Room Generation
-  const rooms: { x: number, y: number, w: number, h: number }[] = [];
-  const numRooms = 8 + Math.floor(level / 5);
+  const layoutType = ['ROOMS', 'OPEN', 'MAZE', 'CORRIDORS', 'SYMMETRIC', 'CHAOTIC'][Math.floor(Math.random() * 6)];
 
-  for (let i = 0; i < numRooms; i++) {
-    const w = Math.floor(Math.random() * 6) + 4;
-    const h = Math.floor(Math.random() * 6) + 4;
-    const x = Math.floor(Math.random() * (currentWidth - w - 2)) + 1;
-    const y = Math.floor(Math.random() * (currentHeight - h - 2)) + 1;
-
-    // Check overlap
-    const overlap = rooms.some(r => x < r.x + r.w + 1 && x + w + 1 > r.x && y < r.y + r.h + 1 && y + h + 1 > r.y);
-    if (!overlap) {
-      rooms.push({ x, y, w, h });
-      for (let ry = y; ry < y + h; ry++) {
-        for (let rx = x; rx < x + w; rx++) {
-          map[ry][rx] = 'FLOOR';
-        }
+  if (layoutType === 'OPEN') {
+    for (let y = 5; y < currentHeight - 5; y++) {
+      for (let x = 5; x < currentWidth - 5; x++) {
+        map[y][x] = 'FLOOR';
       }
     }
+  } else if (layoutType === 'MAZE') {
+    // Simple cellular automata or recursive backtracker could go here, for now using room-scatter
+    generateRoomLayout(map, currentWidth, currentHeight, 20 + level, 2, 4);
+  } else {
+    // Default ROOMS
+    generateRoomLayout(map, currentWidth, currentHeight, 10 + Math.floor(level / 5), 4, 8);
   }
 
-  // Connect Rooms with Tunnels
-  for (let i = 0; i < rooms.length - 1; i++) {
-    let start = rooms[i];
-    let end = rooms[i + 1];
-    let cx = Math.floor(start.x + start.w / 2);
-    let cy = Math.floor(start.y + start.h / 2);
-    let tx = Math.floor(end.x + end.w / 2);
-    let ty = Math.floor(end.y + end.h / 2);
-
-    while (cx !== tx) {
-      map[cy][cx] = 'FLOOR';
-      cx += cx < tx ? 1 : -1;
-    }
-    while (cy !== ty) {
-      map[cy][cx] = 'FLOOR';
-      cy += cy < ty ? 1 : -1;
-    }
-  }
-
-  // Random Biome
-  const theme = BIOME_ORDER[Math.floor(Math.random() * BIOME_ORDER.length)];
+  const theme = BIOMES[Math.floor(Math.random() * BIOMES.length)];
 
   const occupied = new Set<string>();
   const getFreeTile = () => {
@@ -68,10 +42,6 @@ export function generateDungeon(level: number) {
         return { x: rx, y: ry };
       }
     }
-    // Fallback if needed
-    if (rooms.length > 0) {
-        return { x: rooms[0].x, y: rooms[0].y };
-    }
     return { x: 1, y: 1 };
   };
 
@@ -80,50 +50,79 @@ export function generateDungeon(level: number) {
   const keyPos = getFreeTile();
   
   const enemies: Enemy[] = [];
+  const enemyPool = BIOME_ENEMIES[theme];
   for (let i = 0; i < targetEnemies; i++) {
     const pos = getFreeTile();
-    const types = ENEMY_TYPES.filter(t => t.minLevel <= level);
-    const type = types[Math.floor(Math.random() * types.length)].name;
+    const type = enemyPool[Math.floor(Math.random() * enemyPool.length)];
     enemies.push({
       id: `e-${level}-${i}`,
       x: pos.x, y: pos.y,
       type: type,
-      stats: generateEnemyStats(level, level > 120),
+      stats: generateEnemyStats(level, level > 120 || Math.random() > 0.95),
       isBoss: level % 10 === 0 && i === 0
     });
   }
 
   const chests: Chest[] = [];
-  const numChests = Math.random() > 0.6 ? 2 : 1;
+  const numChests = Math.random() > 0.4 ? 2 : 1;
   for (let i = 0; i < numChests; i++) {
     const pos = getFreeTile();
     chests.push({ id: `c-${level}-${i}`, x: pos.x, y: pos.y });
   }
 
   const potions: PotionEntity[] = [];
-  const numPotions = Math.floor(Math.random() * 2) + 2; 
+  const numPotions = Math.floor(Math.random() * 3) + 1; 
   for (let i = 0; i < numPotions; i++) {
     const pos = getFreeTile();
     potions.push({
       id: `p-${level}-${i}`,
       x: pos.x,
       y: pos.y,
-      percent: Math.random() > 0.8 ? 50 : 25
+      percent: Math.random() > 0.9 ? 75 : Math.random() > 0.7 ? 50 : 25
     });
   }
 
   const altarPos = getFreeTile();
-  let merchantPos = (level % 5 === 0 || level === 1) ? getFreeTile() : undefined;
+  let merchantPos = (level % 5 === 0 || level === 1 || Math.random() > 0.85) ? getFreeTile() : undefined;
 
   return { map, theme, playerPos, stairsPos, enemies, chests, potions, keyPos, merchantPos, altarPos };
 }
 
+function generateRoomLayout(map: TileType[][], w: number, h: number, count: number, minS: number, maxS: number) {
+    const rooms: { x: number, y: number, w: number, h: number }[] = [];
+    for (let i = 0; i < count; i++) {
+        const rw = Math.floor(Math.random() * (maxS - minS)) + minS;
+        const rh = Math.floor(Math.random() * (maxS - minS)) + minS;
+        const rx = Math.floor(Math.random() * (w - rw - 2)) + 1;
+        const ry = Math.floor(Math.random() * (h - rh - 2)) + 1;
+        const overlap = rooms.some(r => rx < r.x + r.w + 1 && rx + rw + 1 > r.x && ry < r.y + r.h + 1 && ry + rh + 1 > r.y);
+        if (!overlap) {
+            rooms.push({ x: rx, y: ry, w: rw, h: rh });
+            for (let y = ry; y < ry + rh; y++) {
+                for (let x = rx; x < rx + rw; x++) {
+                    map[y][x] = 'FLOOR';
+                }
+            }
+        }
+    }
+    for (let i = 0; i < rooms.length - 1; i++) {
+        let s = rooms[i];
+        let e = rooms[i + 1];
+        let cx = Math.floor(s.x + s.w / 2);
+        let cy = Math.floor(s.y + s.h / 2);
+        let tx = Math.floor(e.x + e.w / 2);
+        let ty = Math.floor(e.y + e.h / 2);
+        while (cx !== tx) { map[cy][cx] = 'FLOOR'; cx += cx < tx ? 1 : -1; }
+        while (cy !== ty) { map[cy][cx] = 'FLOOR'; cy += cy < ty ? 1 : -1; }
+    }
+}
+
 function generateEnemyStats(level: number, isElite: boolean): EntityStats {
-  const eliteMult = isElite ? 2.2 : 1.0;
-  const hp = Math.floor((50 + (level * 15)) * eliteMult);
-  const atk = Math.floor((8 + (level * 3.5)) * eliteMult);
-  const arm = Math.floor((3 + (level * 2.2)) * eliteMult);
-  const spd = 8 + (level / 9) + (isElite ? 6 : 0);
+  const eliteMult = isElite ? 2.5 : 1.0;
+  const hp = Math.floor((40 + (level * 12)) * eliteMult);
+  const atk = Math.floor((6 + (level * 3)) * eliteMult);
+  const arm = Math.floor((2 + (level * 2)) * eliteMult);
+  const spd = 7 + (level / 10) + (isElite ? 5 : 0);
   return { hp, maxHp: hp, attack: atk, armor: arm, maxArmor: arm, speed: spd };
 }
 

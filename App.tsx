@@ -74,7 +74,7 @@ const App: React.FC = () => {
     } catch (e) {}
   }, [currentLang]);
 
-  const t = TRANSLATIONS[currentLang];
+  const t = TRANSLATIONS[currentLang] || TRANSLATIONS.PT;
 
   const playSound = (freq: number, type: OscillatorType = 'sine', duration: number = 0.1, gainVal: number = 0.05) => {
     if (isMutedRef.current || !audioContext.current) return;
@@ -132,8 +132,11 @@ const App: React.FC = () => {
         if (activeRelic?.id === 'gaze') startInventory.push({ id: 'relic-potion', percent: 70, x: 0, y: 0 });
         if (activeRelic?.id === 'mark') { currentGold += 60; currentStats.maxHp = Math.floor(currentStats.maxHp * 0.9); currentStats.hp = currentStats.maxHp; }
         if (activeRelic?.id === 'heart') { currentStats.attack = Math.floor(currentStats.attack * 1.1); currentStats.maxHp = Math.floor(currentStats.maxHp * 0.95); currentStats.hp = Math.min(currentStats.hp, currentStats.maxHp); }
+        if (activeRelic?.id === 'echo' && stats) {
+           // echo already accounted if stats were passed, but in fresh start we can't 'inherit' without external state.
+           // assumed stats passed here are the inherited ones from last run death.
+        }
     } else {
-        // Redefine o tamanho do inventário caso não haja maldição no andar anterior que foi limpa
         if (activeRelic?.id === 'slots') invSize = 10;
     }
 
@@ -143,7 +146,6 @@ const App: React.FC = () => {
       gameStatus: (level === 1 && !stats) ? 'TUTORIAL' as const : 'PLAYING' as const,
       logs: (level === 1 && !stats) ? [`${finalPlayerName} entrou no abismo.`] : [`Descendo para o nível ${level}`],
       inventory: startInventory, inventorySize: invSize, activePet, activeRelic, language: currentLang, hasUsedAltarInLevel: false, tronModeActive: false, tronTimeLeft: 0, tronTrail: [],
-      // IMPORTANTE: Bençãos e Maldições são limpas entre andares
       activeAltarEffect: undefined, keyPath: undefined 
     };
     playerPosRef.current = newState.playerPos;
@@ -169,7 +171,22 @@ const App: React.FC = () => {
         const updatedPet = prev.activePet ? { ...prev.activePet, pos: oldPos } : undefined;
         const enemy = prev.enemies.find(e => e.x === nextPos.x && e.y === nextPos.y);
         
-        if (enemy) { setMoveQueue([]); return { ...prev, gameStatus: 'COMBAT' as const, currentEnemy: enemy } as GameState; }
+        if (enemy) { 
+          setMoveQueue([]); 
+          if (prev.tronModeActive) {
+            // Trample effect
+            playAttackSound('player');
+            const goldTrample = Math.floor(Math.random() * 21) + 10;
+            return { 
+              ...prev, 
+              enemies: prev.enemies.filter(e => e.id !== enemy.id),
+              enemiesKilledInLevel: prev.enemiesKilledInLevel + 1,
+              gold: prev.gold + goldTrample,
+              logs: [...prev.logs, t.log_trampled]
+            } as GameState;
+          }
+          return { ...prev, gameStatus: 'COMBAT' as const, currentEnemy: enemy } as GameState; 
+        }
         
         const chest = prev.chests.find(c => c.x === nextPos.x && c.y === nextPos.y);
         if (chest) { setMoveQueue([]); return { ...prev, gameStatus: 'CHEST_OPEN' as const, chests: prev.chests.filter(c => c.id !== chest.id) } as GameState; }
@@ -215,33 +232,30 @@ const App: React.FC = () => {
       const updatedPet = prev.activePet ? { ...prev.activePet, hp: petHp || 0 } : undefined;
       let finalGoldEarned = goldEarned;
 
-      // Bençãos/Relíquias de Ouro
       if (prev.activeRelic?.id === 'bag') finalGoldEarned = Math.floor(finalGoldEarned * 1.05);
       if (prev.activeAltarEffect?.id === 'sacred_greed') finalGoldEarned = Math.floor(finalGoldEarned * 1.5);
       if (prev.activeAltarEffect?.id === 'cursed_greed') finalGoldEarned = Math.floor(finalGoldEarned * 0.5);
       
       let nextStats = { ...newStats };
 
-      // Benção Sangue Afiado (+10% dano permanente no andar após primeira morte)
-      if (prev.activeAltarEffect?.id === 'sharp_blood') {
+      if (prev.activeAltarEffect?.id === 'sharp_blood' && prev.enemiesKilledInLevel === 0) {
          nextStats.attack = Math.floor(nextStats.attack * 1.1);
       }
-
-      // Benção Sangue Rendido (Cura 30% ao matar)
       if (prev.activeAltarEffect?.id === 'surrendered_blood') {
         nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.3));
       }
-
-      // Maldição Tributo de Sangue (Perde HP ao ganhar ouro)
       if (prev.activeAltarEffect?.id === 'blood_tribute' && finalGoldEarned > 0) {
         nextStats.hp = Math.max(1, nextStats.hp - 5);
+      }
+      if (prev.activeRelic?.id === 'vamp') {
+        nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.15));
       }
 
       playCoinSound();
       const updated: GameState = {
         ...prev, playerStats: nextStats, gold: prev.gold + finalGoldEarned, gameStatus: 'PLAYING' as const,
         enemies: prev.enemies.filter(e => e.id !== prev.currentEnemy?.id),
-        enemiesKilledInLevel: prev.enemiesKilledInLevel + 1, activePet: updatedPet, currentEnemy: undefined, keyPath: undefined
+        enemiesKilledInLevel: prev.enemiesKilledInLevel + 1, activePet: updatedPet, currentEnemy: undefined, keyPath: undefined,
       };
       saveGame(updated);
       return updated;
@@ -254,7 +268,6 @@ const App: React.FC = () => {
     setGameState(prev => {
       if (!prev || !prev.inventory[idx]) return prev;
       
-      // Maldição Oferta Negada (Poção desperdiçada)
       if (prev.activeAltarEffect?.id === 'denied_offering') {
         const newInv = [...prev.inventory];
         newInv.splice(idx, 1);
@@ -265,16 +278,13 @@ const App: React.FC = () => {
       const pot = prev.inventory[idx];
       const stats = { ...prev.playerStats };
       let boost = pot.percent;
-      
-      // Maldição Sede Profana (-10% eficácia)
+      if (prev.activeRelic?.id === 'alch') boost += 5;
       if (prev.activeAltarEffect?.id === 'profane_thirst') boost -= 10;
       
       const heal = Math.floor(stats.maxHp * (boost / 100));
       stats.hp = Math.min(stats.maxHp, stats.hp + heal);
-      
       const newInv = [...prev.inventory];
       
-      // Benção Oferta Aceita (Não consome a poção)
       if (prev.activeAltarEffect?.id !== 'accepted_offering') {
         newInv.splice(idx, 1);
       }
@@ -285,56 +295,88 @@ const App: React.FC = () => {
     return used;
   };
 
-  const handleShare = useCallback(() => {
-    const shareText = `RogueQuest - Profundidade: ${gameState?.level} do Abismo!`;
+  const handleShare = async () => {
+    const heroName = gameState?.playerName || 'Herói';
+    const level = gameState?.level || 1;
+    const atk = gameState?.playerStats.attack || 0;
+    const armor = gameState?.playerStats.maxArmor || 0;
+    
+    const shareText = `🎮 ROGUEQUEST: O Despertar\n🏆 Herói: ${heroName}\n📍 Nível Alcançado: ${level}\n⚔️ Ataque: ${atk}\n🛡️ Escudo: ${armor}\n\nDesafie o abismo você também! #RogueQuest\n${window.location.href}`;
+    
+    const copyFallback = (text: string) => {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      textArea.style.top = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        return successful;
+      } catch (err) {
+        document.body.removeChild(textArea);
+        return false;
+      }
+    };
+
+    const doCopy = async (text: string) => {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (e) {}
+      return copyFallback(text);
+    };
+
     if (navigator.share) {
-      navigator.share({ title: 'RogueQuest', text: shareText, url: window.location.href }).catch(() => {});
+      try {
+        await navigator.share({ title: 'ROGUEQUEST: The Eternal Descent', text: shareText });
+      } catch (err) {
+        if (await doCopy(shareText)) alert("Progresso copiado para a área de transferência!");
+      }
     } else {
-      navigator.clipboard.writeText(`${shareText} ${window.location.href}`);
-      alert("Link Copiado!");
+      if (await doCopy(shareText)) alert("Progresso copiado para a área de transferência!");
     }
-  }, [gameState?.level]);
+  };
 
   const startRebirth = () => {
-    if (!gameState) return;
     const options = [...RELICS_POOL].sort(() => 0.5 - Math.random()).slice(0, 3);
-    setGameState({ ...gameState, gameStatus: 'RELIC_SELECTION' as const, relicOptions: options });
+    setGameState(prev => prev ? { ...prev, gameStatus: 'RELIC_SELECTION' as const, relicOptions: options } : null);
   };
 
   const handleRelicSelect = (relic: Relic) => {
-    const stats = { ...INITIAL_PLAYER_STATS };
-    const oldStats = gameState?.lastStats;
-    if (relic.id === 'echo' && oldStats) {
-        stats.attack += Math.floor(oldStats.attack * 0.2); stats.maxArmor += Math.floor(oldStats.maxArmor * 0.2);
-        stats.armor = stats.maxArmor; stats.speed += Math.floor(oldStats.speed * 0.2);
-        stats.maxHp += Math.floor(oldStats.maxHp * 0.2); stats.hp = stats.maxHp;
+    let inheritedStats = { ...INITIAL_PLAYER_STATS };
+    if (relic.id === 'echo' && gameState?.lastStats) {
+      inheritedStats.hp = Math.floor(inheritedStats.hp + (gameState.lastStats.hp * 0.2));
+      inheritedStats.maxHp = Math.floor(inheritedStats.maxHp + (gameState.lastStats.maxHp * 0.2));
+      inheritedStats.attack = Math.floor(inheritedStats.attack + (gameState.lastStats.attack * 0.2));
+      inheritedStats.maxArmor = Math.floor(inheritedStats.maxArmor + (gameState.lastStats.maxArmor * 0.2));
+      inheritedStats.armor = inheritedStats.maxArmor;
+      inheritedStats.speed = Math.floor(inheritedStats.speed + (gameState.lastStats.speed * 0.2));
     }
-    initLevel(1, stats, 0, nameInput, undefined, relic, []);
+    initLevel(1, inheritedStats, 0, nameInput, undefined, relic, []);
   };
 
   if (!gameState) return null;
 
   return (
     <div className="bg-black min-h-screen text-zinc-300 font-sans selection:bg-red-500/30 overflow-x-hidden">
-      {gameState.gameStatus === 'START_SCREEN' && (
+      {gameState.gameStatus === 'START_SCREEN' ? (
         <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center p-8 bg-black">
-          <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in-95 duration-700">
-            <div className="space-y-2 mb-12">
-              <h1 className="text-6xl md:text-7xl font-sans font-black tracking-tighter flex items-center justify-center">
-                <span className="text-white">ROGUE</span><span className="text-red-800">QUEST</span>
-              </h1>
-              <p className="text-zinc-500 font-mono text-[10px] tracking-[0.8em] font-bold uppercase mt-2 pl-[0.8em]">O ABISMO INFINITO</p>
-            </div>
+          <div className="max-w-md w-full text-center space-y-12 animate-in fade-in zoom-in-95 duration-700">
+            <h1 className="text-6xl md:text-7xl font-sans font-black tracking-tighter flex items-center justify-center leading-none">
+              <span className="text-white">ROGUE</span><span className="text-red-800">QUEST</span>
+            </h1>
             <div className="bg-[#0f0f0f] border border-zinc-800 rounded-[2.5rem] p-10 space-y-8 shadow-2xl">
               {!isNewGameMode && gameState.playerName ? (
                 <div className="space-y-4">
-                  <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
-                    <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Herói Ativo</p>
-                    <p className="text-sm font-black text-white">{gameState.playerName}</p>
-                    <p className="text-[10px] font-bold text-red-800 uppercase">Profundidade: {gameState.level}</p>
-                  </div>
                   <button onClick={() => { startMusic(); setGameState({ ...gameState, gameStatus: 'PLAYING' as const }); }} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95">{t.continue_journey}</button>
                   <button onClick={() => setIsNewGameMode(true)} className="w-full bg-[#1e1e1e] hover:bg-[#2a2a2a] py-5 rounded-2xl text-zinc-500 font-mono font-bold text-[10px] uppercase tracking-widest transition-all">{t.new_game}</button>
+                  <button onClick={() => window.open('https://t.me/c/2134721525/27', '_blank')} className="w-full bg-zinc-900 border-2 border-zinc-800 text-zinc-500 rounded-2xl py-4 font-mono font-bold text-[9px] uppercase tracking-widest hover:text-white transition-all">Feedback</button>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -346,38 +388,33 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {gameState.gameStatus === 'NEXT_LEVEL' && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-8 space-y-12 animate-in fade-in duration-500">
-          <div className="text-center space-y-4">
-            <h2 className="text-4xl md:text-5xl font-black text-red-600 uppercase tracking-tighter animate-pulse drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">
-              VOCÊ ESTÁ DESCENDO MAIS FUNDO...
-            </h2>
-            <div className="w-24 h-1 bg-red-900 mx-auto rounded-full" />
-          </div>
-          <button onClick={() => initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, gameState.activeRelic, gameState.inventory)} className="px-12 py-6 bg-white text-black font-black rounded-2xl uppercase tracking-[0.2em] text-lg hover:bg-zinc-200 transition-all shadow-[0_0_40px_rgba(255,255,255,0.3)] active:scale-95">Prosseguir</button>
-        </div>
-      )}
-
-      {gameState.gameStatus !== 'START_SCREEN' && gameState.gameStatus !== 'WON' && gameState.gameStatus !== 'NEXT_LEVEL' && gameState.gameStatus !== 'RELIC_SELECTION' && gameState.map.length > 0 && (
+      ) : (
         <div className="max-w-[480px] mx-auto p-4 flex flex-col gap-4 min-h-screen">
           <header className="flex justify-between items-start py-4 px-1 border-b border-zinc-900 mb-2">
             <div className="flex flex-col">
-              <h2 className="text-2xl font-black tracking-tighter uppercase flex leading-none"><span className="text-white">ROGUE</span><span className="text-red-800">QUEST</span></h2>
-              <p className="text-[9px] font-mono text-zinc-500 font-bold uppercase tracking-[0.2em] mt-1">{t[THEME_CONFIG[gameState.theme].nameKey]} – {t.level} {gameState.level}</p>
+              <h2 className="text-2xl font-black tracking-tighter uppercase flex leading-none">
+                <span className="text-white">ROGUE</span><span className="text-red-800">QUEST</span>
+              </h2>
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mt-1 leading-none">
+                {t.level} {gameState.level} — {t[THEME_CONFIG[gameState.theme].nameKey]}
+              </p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => window.open('https://t.me/ComunidadeRQ', '_blank')} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors"><Icon.Users /></button>
-              <button onClick={handleShare} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors"><Icon.Share /></button>
-              <button onClick={() => setIsMuted(!isMuted)} className={`w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center transition-colors ${isMuted ? 'text-zinc-600' : 'text-red-800'}`}>{isMuted ? <Icon.VolumeX /> : <Icon.Volume2 />}</button>
+              <button onClick={() => window.open('https://t.me/ComunidadeRQ', '_blank')} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors" title="Comunidade"><Icon.Users /></button>
+              <button onClick={handleShare} className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-colors" title="Compartilhar"><Icon.Share /></button>
+              <button onClick={() => setIsMuted(!isMuted)} className={`w-10 h-10 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-center justify-center transition-colors ${isMuted ? 'text-zinc-600' : 'text-red-800'}`} title="Som">{isMuted ? <Icon.VolumeX /> : <Icon.Volume2 />}</button>
             </div>
           </header>
-          <GameMap 
-            map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} keyPath={gameState.keyPath} onTileClick={handleTileClick} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} 
-            ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'}
-          />
-          <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}/>
+
+          {gameState.gameStatus !== 'WON' && gameState.gameStatus !== 'NEXT_LEVEL' && gameState.gameStatus !== 'RELIC_SELECTION' && gameState.map.length > 0 && (
+            <div className="flex flex-col gap-4">
+              <GameMap 
+                map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} keyPath={gameState.keyPath} onTileClick={handleTileClick} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} 
+                ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'}
+              />
+              <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}/>
+            </div>
+          )}
         </div>
       )}
 
@@ -386,48 +423,9 @@ const App: React.FC = () => {
           <div className="max-w-md w-full text-center space-y-8 py-10">
             <h2 className="text-6xl font-black text-red-600 uppercase tracking-tighter drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]">{t.death_title}</h2>
             <div className="bg-[#0f0f0f] border-2 border-zinc-800 rounded-[2.5rem] p-8 space-y-8 shadow-2xl">
-              <div className="space-y-4">
-                <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.4em] font-bold border-b border-zinc-800 pb-2">{t.final_stats}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-black/40 p-3 rounded-2xl border border-zinc-800/50 flex flex-col items-center">
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase">{t.level}</span>
-                    <span className="text-lg font-black text-white">{gameState.level}</span>
-                  </div>
-                  <div className="bg-black/40 p-3 rounded-2xl border border-zinc-800/50 flex flex-col items-center">
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase">{t.hp}</span>
-                    <span className="text-lg font-black text-red-500">0</span>
-                  </div>
-                  <div className="bg-black/40 p-3 rounded-2xl border border-zinc-800/50 flex flex-col items-center">
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase">{t.atk}</span>
-                    <span className="text-lg font-black text-yellow-500">{gameState.lastStats?.attack || 0}</span>
-                  </div>
-                  <div className="bg-black/40 p-3 rounded-2xl border border-zinc-800/50 flex flex-col items-center">
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase">{t.armor}</span>
-                    <span className="text-lg font-black text-blue-500">{gameState.lastStats?.maxArmor || 0}</span>
-                  </div>
-                  <div className="bg-black/40 p-3 rounded-2xl border border-zinc-800/50 flex flex-col items-center col-span-2">
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase">{t.vel}</span>
-                    <span className="text-lg font-black text-green-500">{gameState.lastStats?.speed || 0}</span>
-                  </div>
-                </div>
-                {gameState.activeRelic && (
-                  <div className="p-4 bg-purple-950/10 border border-purple-500/20 rounded-2xl text-left flex items-center gap-4">
-                    <div className="text-purple-500">{React.createElement((Icon as any)[gameState.activeRelic.icon], { width: 24, height: 24 })}</div>
-                    <div>
-                      <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest">{t.relic_active}</p>
-                      <p className="text-[10px] text-white font-bold">{gameState.activeRelic.name}</p>
-                    </div>
-                  </div>
-                )}
-                {gameState.activeAltarEffect && (
-                  <div className={`p-4 bg-[#111] border rounded-2xl text-left flex items-center gap-4 ${gameState.activeAltarEffect.type === 'BLESSING' ? 'border-yellow-500/20' : 'border-purple-600/20'}`}>
-                    <div className={gameState.activeAltarEffect.type === 'BLESSING' ? 'text-yellow-500' : 'text-purple-600'}><Icon.Altar width={24} height={24} /></div>
-                    <div>
-                      <p className={`text-[8px] font-black uppercase tracking-widest ${gameState.activeAltarEffect.type === 'BLESSING' ? 'text-yellow-500' : 'text-purple-600'}`}>{gameState.activeAltarEffect.type}</p>
-                      <p className="text-[10px] text-white font-bold">{t[gameState.activeAltarEffect.nameKey]}</p>
-                    </div>
-                  </div>
-                )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-black/40 p-3 rounded-2xl border border-zinc-800/50 flex flex-col items-center"><span className="text-[9px] font-bold text-zinc-500 uppercase">{t.level}</span><span className="text-lg font-black text-white">{gameState.level}</span></div>
+                <div className="bg-black/40 p-3 rounded-2xl border border-zinc-800/50 flex flex-col items-center"><span className="text-[9px] font-bold text-zinc-500 uppercase">{t.atk}</span><span className="text-lg font-black text-yellow-500">{gameState.lastStats?.attack || 0}</span></div>
               </div>
               <button onClick={startRebirth} className="w-full py-5 bg-red-800 hover:bg-red-700 text-white font-black rounded-2xl uppercase tracking-widest text-sm transition-all shadow-xl active:scale-95">{t.rebirth}</button>
             </div>
@@ -435,8 +433,9 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Modais de gameplay */}
       {gameState.gameStatus === 'COMBAT' && gameState.currentEnemy && <CombatModal playerStats={gameState.playerStats} enemy={gameState.currentEnemy} activePet={gameState.activePet} language={currentLang} altarEffect={gameState.activeAltarEffect} relic={gameState.activeRelic} inventory={gameState.inventory} onAttackSound={playAttackSound} onUsePotion={usePotionFromInventory} onFinish={onCombatFinish} />}
-      {gameState.gameStatus === 'CHEST_OPEN' && <ChestModal onChoice={(choice) => {
+      {gameState.gameStatus === 'CHEST_OPEN' && <ChestModal language={currentLang} onChoice={(choice, extra) => {
           setGameState(prev => {
             if (!prev) return prev;
             const stats = { ...prev.playerStats };
@@ -444,9 +443,29 @@ const App: React.FC = () => {
             if (choice === 'Ataque') stats.attack += 5 * multiplier;
             if (choice === 'Armadura') { stats.maxArmor += 3 * multiplier; stats.armor += 3 * multiplier; }
             if (choice === 'Velocidade') stats.speed += 4 * multiplier;
-            return { ...prev, playerStats: stats, gameStatus: 'PLAYING' as const, activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect } as GameState;
+            
+            let goldToAdd = 0;
+            let newInventory = [...prev.inventory];
+            if (extra === 'gold') {
+               goldToAdd = Math.floor(Math.random() * 21) + 10;
+            } else {
+               const pType = Math.random();
+               const percent = pType > 0.8 ? 75 : pType > 0.5 ? 50 : 25;
+               if (newInventory.length < prev.inventorySize) {
+                 newInventory.push({ id: `chest-pot-${Date.now()}`, percent, x: 0, y: 0 });
+               }
+            }
+
+            return { 
+              ...prev, 
+              playerStats: stats, 
+              gold: prev.gold + goldToAdd,
+              inventory: newInventory,
+              gameStatus: 'PLAYING' as const, 
+              activeAltarEffect: multiplier === 2 ? undefined : prev.activeAltarEffect 
+            } as GameState;
           });
-      }} language={currentLang} />}
+      }} />}
       {gameState.gameStatus === 'MERCHANT_SHOP' && <MerchantShopModal gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} language={currentLang} activeAltarEffect={gameState.activeAltarEffect} onBuyItem={(item) => {
           setGameState(prev => {
             if(!prev) return prev;
@@ -457,75 +476,57 @@ const App: React.FC = () => {
           });
       }} onBuyPotion={(pot, choice) => {
           if(choice === 'use') {
-            setGameState(prev => {
-              if(!prev) return prev;
-              const stats = { ...prev.playerStats };
-              const heal = Math.floor(stats.maxHp * (pot.percent / 100));
-              stats.hp = Math.min(stats.maxHp, stats.hp + heal);
-              return { ...prev, gold: prev.gold - pot.price!, playerStats: stats } as GameState;
-            });
+            const stats = { ...gameState!.playerStats };
+            const heal = Math.floor(stats.maxHp * (pot.percent / 100));
+            stats.hp = Math.min(stats.maxHp, stats.hp + heal);
+            setGameState({ ...gameState!, gold: gameState!.gold - pot.price!, playerStats: stats });
           } else {
-            setGameState(prev => {
-              if(!prev) return prev;
-              if (prev.inventory.length >= prev.inventorySize) { setInventoryFullAlert(true); return prev; }
-              return { ...prev, gold: prev.gold - pot.price!, inventory: [...prev.inventory, pot] } as GameState;
-            });
+            setGameState({ ...gameState!, gold: gameState!.gold - pot.price!, inventory: [...gameState!.inventory, pot] });
           }
       }} onRentTron={() => setGameState(prev => prev ? { ...prev, gold: prev.gold - 25, tronModeActive: true, tronTimeLeft: 15, gameStatus: 'PLAYING' as const } as GameState : null)} onBuyPet={(type) => {
+          const price = type === 'CORVO' || type === 'LOBO' || type === 'PUMA' ? 10 : 15; // Placeholder
           const pet: Pet = { type, name: type, hp: 50, maxHp: 50, pos: { ...playerPosRef.current } };
           setGameState(prev => prev ? { ...prev, gold: prev.gold - 10, activePet: pet } as GameState : null);
       }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)} />}
       
-      {gameState.gameStatus === 'ALTAR_INTERACTION' && <AltarInteractionModal active={gameState.enemiesKilledInLevel > 0 && !gameState.hasUsedAltarInLevel} language={currentLang} onPray={() => {
-          setGameState(prev => {
-            if (!prev) return prev;
-            const isLucky = Math.random() > 0.4; 
-            const pool = isLucky ? BLESSINGS_POOL : CURSES_POOL;
-            const effect = pool[Math.floor(Math.random() * pool.length)];
-            
-            let playerStats = { ...prev.playerStats };
-            let keyPath: Position[] | undefined = undefined;
-            let inventorySize = prev.inventorySize;
-
-            // Benção: Olhos Abertos
-            if (effect.id === 'open_eyes' && prev.keyPos) {
-                const path = findDungeonPath(prev.playerPos, prev.keyPos, prev.map, prev.enemies);
-                if (path) keyPath = path;
-            }
-
-            // Maldição: Menos Peso
-            if (effect.id === 'less_weight') inventorySize = Math.max(1, inventorySize - 2);
-
-            return { 
-                ...prev, 
-                gameStatus: 'ALTAR_RESULT' as const, 
-                activeAltarEffect: effect, 
-                hasUsedAltarInLevel: true, 
-                playerStats, 
-                keyPath, 
-                inventorySize 
-            } as GameState;
-          });
-      }} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } : null)} />}
+      {gameState.gameStatus === 'ALTAR_INTERACTION' && <AltarInteractionModal language={currentLang} active={gameState.enemiesKilledInLevel > 0 && !gameState.hasUsedAltarInLevel} onPray={() => {
+          const isLucky = Math.random() > 0.4; 
+          const pool = isLucky ? BLESSINGS_POOL : CURSES_POOL;
+          const effect = pool[Math.floor(Math.random() * pool.length)];
+          let keyPath: Position[] | undefined = undefined;
+          if (effect.id === 'open_eyes' && gameState!.keyPos) {
+              const path = findDungeonPath(gameState!.playerPos, gameState!.keyPos, gameState!.map, gameState!.enemies);
+              if (path) keyPath = path;
+          }
+          setGameState({ ...gameState!, gameStatus: 'ALTAR_RESULT' as const, activeAltarEffect: effect, hasUsedAltarInLevel: true, keyPath });
+      }} onClose={() => setGameState({ ...gameState!, gameStatus: 'PLAYING' as const })} />}
       
-      {gameState.gameStatus === 'ALTAR_RESULT' && gameState.activeAltarEffect && <AltarResultModal effect={gameState.activeAltarEffect} language={currentLang} onClose={() => setGameState(prev => prev ? { ...prev, gameStatus: 'PLAYING' as const } as GameState : null)} />}
+      {gameState.gameStatus === 'ALTAR_RESULT' && gameState.activeAltarEffect && <AltarResultModal effect={gameState.activeAltarEffect} language={currentLang} onClose={() => setGameState({ ...gameState!, gameStatus: 'PLAYING' as const })} />}
       {gameState.gameStatus === 'RELIC_SELECTION' && gameState.relicOptions && <RelicSelectionModal options={gameState.relicOptions} language={currentLang} onSelect={handleRelicSelect} />}
-      {gameState.gameStatus === 'TUTORIAL' && <TutorialModal onFinish={() => setGameState({...gameState, gameStatus: 'PLAYING' as const})} language={currentLang} />}
+      {gameState.gameStatus === 'TUTORIAL' && <TutorialModal language={currentLang} onFinish={() => setGameState({...gameState, gameStatus: 'PLAYING' as const})} />}
       {gameState.gameStatus === 'PICKUP_CHOICE' && gameState.currentPotion && <PotionPickupModal potion={gameState.currentPotion} language={currentLang} onChoice={(choice) => {
           if (choice === 'use') {
-            const stats = { ...gameState.playerStats };
-            const heal = Math.floor(stats.maxHp * (gameState.currentPotion!.percent / 100));
+            const stats = { ...gameState!.playerStats };
+            const heal = Math.floor(stats.maxHp * (gameState!.currentPotion!.percent / 100));
             stats.hp = Math.min(stats.maxHp, stats.hp + heal);
-            setGameState({...gameState, playerStats: stats, gameStatus: 'PLAYING' as const, currentPotion: undefined});
+            setGameState({...gameState!, playerStats: stats, gameStatus: 'PLAYING' as const, currentPotion: undefined});
           } else {
-            if (gameState.inventory.length < gameState.inventorySize) {
-              setGameState({...gameState, inventory: [...gameState.inventory, gameState.currentPotion!], gameStatus: 'PLAYING' as const, currentPotion: undefined});
+            if (gameState!.inventory.length < gameState!.inventorySize) {
+              setGameState({...gameState!, inventory: [...gameState!.inventory, gameState!.currentPotion!], gameStatus: 'PLAYING' as const, currentPotion: undefined});
             } else {
               setInventoryFullAlert(true);
-              setGameState({...gameState, gameStatus: 'PLAYING' as const, currentPotion: undefined, logs: [...gameState.logs, t.inventory_full]});
+              setGameState({...gameState!, gameStatus: 'PLAYING' as const, currentPotion: undefined});
             }
           }
       }} />}
+      
+      {gameState.gameStatus === 'NEXT_LEVEL' && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-8 space-y-12 animate-in fade-in duration-500">
+          <h2 className="text-4xl md:text-5xl font-black text-red-600 uppercase tracking-tighter animate-pulse drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">DESCENDO MAIS FUNDO...</h2>
+          <button onClick={() => initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, gameState.activeRelic, gameState.inventory)} className="px-12 py-6 bg-white text-black font-black rounded-2xl uppercase tracking-[0.2em] text-lg hover:bg-zinc-200 transition-all shadow-[0_0_40px_rgba(255,255,255,0.3)] active:scale-95">Prosseguir</button>
+        </div>
+      )}
+
       {inventoryFullAlert && (
         <div className="fixed inset-0 z-[150] bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm">
           <div className="bg-zinc-900 border-2 border-red-500 p-8 rounded-3xl max-w-xs w-full text-center space-y-4 animate-in zoom-in-95">
