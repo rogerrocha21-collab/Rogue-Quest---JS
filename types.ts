@@ -43,11 +43,10 @@ export interface PotionEntity extends Position {
   id: string;
   percent: number;
   price?: number;
-  isSuper?: boolean;
 }
 
 export interface Pet {
-  type: 'LOBO' | 'PUMA' | 'CORVO';
+  type: 'CACHORRO' | 'LOBO' | 'URSO' | 'PUMA' | 'CORVO';
   name: string;
   hp: number;
   maxHp: number;

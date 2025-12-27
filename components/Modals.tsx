@@ -126,7 +126,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
             }
 
             if (side === 'player') lastPlayerAttackTurn = turnCount;
-            const msg = side === 'player' ? `${t.combat_player} atacou o inimigo causando ${originalAtk} de dano` : `O inimigo atacou causando ${originalAtk} de dano`;
+            const msg = side === 'player' ? `${t.combat_player} atacou causando ${originalAtk} de dano` : `O inimigo atacou causando ${originalAtk} de dano`;
             addLog(msg, side === 'player' ? 'player' : 'enemy');
             setCurrentPStats({ ...pRef.current }); setCurrentEStats({ ...e }); 
             setIsTakingDamage(side === 'player' ? 'enemy' : 'player');
@@ -160,15 +160,13 @@ export const CombatModal: React.FC<CombatModalProps> = ({
   const handleUsePotion = (idx: number) => {
     if (isDone) return;
     const pot = inventory![idx];
-    const potName = pot.percent <= 25 ? 'Poção Pequena' : pot.percent <= 50 ? 'Poção Média' : 'Poção Grande';
     if (onUsePotion(idx)) { 
       const stats = { ...pRef.current };
-      const boost = pot.percent;
-      const heal = Math.floor(stats.maxHp * (boost / 100));
+      const heal = Math.floor(stats.maxHp * (pot.percent / 100));
       stats.hp = Math.min(stats.maxHp, stats.hp + heal);
       pRef.current = stats;
       setCurrentPStats({ ...stats }); 
-      addLog(`Você usou uma ${potName} e recuperou ${pot.percent}% da Vida`, 'heal'); 
+      addLog(`Curou ${pot.percent}% da Vida`, 'heal'); 
       setIsHealAnim(true);
       setTimeout(() => setIsHealAnim(false), 1200);
     }
@@ -184,7 +182,9 @@ export const CombatModal: React.FC<CombatModalProps> = ({
                 <span className={`text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.4)] ${isHealAnim ? 'text-green-400' : ''}`}><Icon.Player width={40} height={40} /></span>
                 {activePet && petHp > 0 && (
                    <div className="flex flex-col items-center border-l border-[#333] pl-4">
-                      <span className="text-orange-400 animate-pet-wiggle"><Icon.Wolf width={30} height={30} /></span>
+                      <span className="text-orange-400 animate-pet-wiggle">
+                        {activePet.type === 'LOBO' ? <Icon.Wolf width={30} height={30} /> : <Icon.Wolf width={30} height={30} />}
+                      </span>
                    </div>
                 )}
              </div>
@@ -193,45 +193,36 @@ export const CombatModal: React.FC<CombatModalProps> = ({
              </div>
              <span className={`text-[10px] font-black uppercase ${isHealAnim ? 'text-green-400 animate-bounce' : 'text-zinc-500'}`}>{currentPStats.hp} / {currentPStats.maxHp} HP</span>
           </div>
-          <div className="flex items-center justify-center opacity-20"><span className="text-zinc-600 text-xl font-black">VS</span></div>
+          <div className="flex items-center justify-center opacity-20 font-black">VS</div>
           <div className={`flex-1 flex flex-col items-center gap-4 p-5 rounded-[1.5rem] bg-[#111] border border-[#333] transition-all ${isTakingDamage === 'enemy' ? 'animate-shake border-red-900' : ''}`}>
-             <span className={enemy.isBoss ? 'text-red-600' : 'text-zinc-500'}>
-                <Icon.Enemy isBoss={enemy.isBoss} width={40} height={40} />
-             </span>
+             <span className={enemy.isBoss ? 'text-red-600' : 'text-zinc-500'}><Icon.Enemy isBoss={enemy.isBoss} width={40} height={40} /></span>
              <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-[#222]">
                 <div className="h-full bg-zinc-700 transition-all duration-500" style={{ width: `${(currentEStats.hp / currentEStats.maxHp) * 100}%` }} />
              </div>
-             <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none">{enemy.type}</span>
+             <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">{enemy.type}</span>
           </div>
         </div>
-        <div className="bg-[#050505] border border-[#222] rounded-2xl p-5 h-44 overflow-hidden shadow-inner flex flex-col">
-          <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-2 border-b border-[#111] pb-1">Histórico de Combate</p>
-          <div ref={scrollRef} className="overflow-y-auto h-full space-y-2 no-scrollbar font-mono">
+        <div className="bg-[#050505] border border-[#222] rounded-2xl p-5 h-44 overflow-hidden flex flex-col">
+          <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-2 border-b border-[#111] pb-1">Log de Turnos</p>
+          <div ref={scrollRef} className="overflow-y-auto h-full space-y-2 no-scrollbar font-mono text-[11px] font-bold">
             {combatLogs.map((log, i) => (
-              <p key={i} className={`text-[11px] leading-tight font-bold ${log.type === 'player' ? 'text-zinc-400' : log.type === 'enemy' ? 'text-red-500' : log.type === 'pet' ? 'text-purple-500' : log.type === 'heal' ? 'text-green-400 animate-pulse' : 'text-yellow-600'}`}>
+              <p key={i} className={log.type === 'player' ? 'text-zinc-400' : log.type === 'enemy' ? 'text-red-500' : log.type === 'pet' ? 'text-purple-500' : log.type === 'heal' ? 'text-green-400' : 'text-yellow-600'}>
                 {log.msg}
               </p>
             ))}
           </div>
         </div>
-        {!isDone && inventory && inventory.length > 0 && (
-          <div className="flex justify-center flex-wrap gap-2 p-3 bg-[#111] rounded-2xl border border-[#222]">
-            {inventory.map((pot, i) => {
-               const potName = pot.percent <= 25 ? 'Pequena' : pot.percent <= 50 ? 'Média' : 'Grande';
-               return (
-                <button key={i} onClick={() => handleUsePotion(i)} className="flex items-center gap-2 px-4 py-2 bg-pink-950/10 border border-pink-500/20 rounded-xl text-pink-500 hover:bg-pink-900/20 active:scale-95 transition-all group overflow-hidden">
-                  <Icon.Potion width={14} height={14} />
-                  <div className="flex flex-col items-start leading-none">
-                    <span className="text-[9px] font-black uppercase whitespace-nowrap">{potName}</span>
-                    <span className="text-[7px] font-bold opacity-60">Regenera {pot.percent}%</span>
-                  </div>
-                </button>
-               )
-            })}
+        {!isDone && inventory.length > 0 && (
+          <div className="flex justify-center gap-2 p-3 bg-[#111] rounded-2xl border border-[#222]">
+            {inventory.map((pot, i) => (
+              <button key={i} onClick={() => handleUsePotion(i)} className="flex items-center gap-2 px-3 py-1 bg-pink-950/10 border border-pink-500/20 rounded-xl text-pink-500 hover:bg-pink-900/20 transition-all">
+                <Icon.Potion width={14} height={14} /> <span className="text-[9px] font-black">{pot.percent}%</span>
+              </button>
+            ))}
           </div>
         )}
         {isDone && (
-          <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 21) + 10, petHp)} className={`w-full font-black py-5 rounded-2xl uppercase text-[12px] tracking-[0.2em] transition-all transform active:scale-95 shadow-2xl ${currentPStats.hp > 0 ? "bg-[#16a34a] text-white hover:bg-[#15803d]" : "bg-red-800 text-white hover:bg-red-700"}`}>
+          <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 21) + 10, petHp)} className={`w-full font-black py-5 rounded-2xl uppercase text-[12px] tracking-[0.2em] transition-all ${currentPStats.hp > 0 ? "bg-green-600 text-white hover:bg-green-500" : "bg-red-800 text-white hover:bg-red-700"}`}>
             {currentPStats.hp > 0 ? t.collect_reward : t.succumb}
           </button>
         )}
@@ -240,106 +231,148 @@ export const CombatModal: React.FC<CombatModalProps> = ({
   );
 };
 
-interface MerchantShopModalProps {
-  gold: number;
-  level: number;
-  hasPet: boolean;
-  language?: Language;
-  onBuyItem: (item: ItemEntity) => void;
-  onBuyPotion: (pot: PotionEntity, choice: 'use' | 'store') => void;
-  onRentTron: () => void;
-  onBuyPet: (type: Pet['type']) => void;
-  onClose: () => void;
-  activeAltarEffect?: AltarEffect;
-}
-
-export const MerchantShopModal: React.FC<MerchantShopModalProps> = ({
-  gold, level, hasPet, language = 'PT', onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose, activeAltarEffect
+export const MerchantShopModal: React.FC<{ gold: number, level: number, hasPet: boolean, language: Language, activeAltarEffect?: AltarEffect, onBuyItem: (item: ItemEntity) => void, onBuyPotion: (pot: PotionEntity, choice: 'use' | 'store') => void, onRentTron: () => void, onBuyPet: (type: Pet['type']) => void, onClose: () => void }> = ({
+  gold, level, hasPet, language, activeAltarEffect, onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose
 }) => {
   const t = TRANSLATIONS[language];
-  const isMerchantBlessing = activeAltarEffect?.id === 'merchant_blessing';
-  const priceMult = isMerchantBlessing ? 0.8 : 1.0;
+  const discount = activeAltarEffect?.id === 'merchant_blessing' ? 0.8 : 1.0;
 
-  const shopItems = useMemo(() => {
-    return [...ITEM_POOL].sort(() => 0.5 - Math.random()).slice(0, 3).map(item => ({
-        ...item, id: `shop-item-${Math.random()}`,
-        price: Math.floor(item.basePrice * (1 + level * 0.1) * priceMult),
-        x: 0, y: 0
-      })) as ItemEntity[];
-  }, [level, priceMult]);
+  const items = useMemo(() => ITEM_POOL.sort(() => 0.5 - Math.random()).slice(0, 3).map(it => ({
+    ...it, id: `it-${Math.random()}`, price: Math.floor(it.basePrice * (1 + level * 0.1) * discount), x: 0, y: 0
+  })) as ItemEntity[], [level, discount]);
 
-  const potions = useMemo(() => [
-    { id: 'p25', percent: 25, price: Math.floor(15 * priceMult) },
-    { id: 'p50', percent: 50, price: Math.floor(30 * priceMult) },
-    { id: 'p75', percent: 75, price: Math.floor(45 * priceMult) }
-  ], [priceMult]);
+  const potions: PotionEntity[] = [
+    { id: 'p25', percent: 25, price: Math.floor(15 * discount), x: 0, y: 0 }, 
+    { id: 'p50', percent: 50, price: Math.floor(30 * discount), x: 0, y: 0 }, 
+    { id: 'p75', percent: 75, price: Math.floor(45 * discount), x: 0, y: 0 }
+  ];
 
   return (
     <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4 backdrop-blur-lg">
-      <div className="bg-[#111] border border-[#222] max-w-xl w-full max-h-[85vh] p-4 md:p-6 rounded-[2.5rem] shadow-2xl flex flex-col gap-4 overflow-hidden">
-        <div className="flex justify-between items-end border-b border-[#222] pb-4 flex-shrink-0">
+      <div className="bg-[#111] border border-[#222] max-w-xl w-full max-h-[85vh] p-6 rounded-[2.5rem] shadow-2xl flex flex-col gap-5 overflow-hidden">
+        <div className="flex justify-between items-end border-b border-[#222] pb-4">
           <div>
-            <h2 className="text-xl font-black text-white uppercase tracking-tighter">{t.merchant_title}</h2>
+            <h2 className="text-xl font-black text-white uppercase tracking-tighter">MERCADOR</h2>
             <div className="flex items-center gap-2 text-yellow-500 font-black text-[11px] mt-1">
               <Icon.Gold /> <span>{gold} MOEDAS</span>
-              {isMerchantBlessing && <span className="text-green-500 text-[8px] ml-2 animate-pulse">(-20% OFF)</span>}
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white p-2">FECHAR</button>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white p-2">SAIR</button>
         </div>
-        <div className="flex-1 overflow-y-auto pr-2 space-y-5 no-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {shopItems.map(item => (
-              <button key={item.id} disabled={gold < (item.price || 0)} onClick={() => onBuyItem(item)} className="p-4 bg-[#1a1a1a] border border-[#333] rounded-2xl hover:border-indigo-500 disabled:opacity-30 transition-all text-left group">
-                <div className="text-indigo-500 mb-3 group-hover:scale-110 transition-transform">
-                  {item.iconType === 'sword' ? <Icon.Sword width={20} height={20}/> : item.iconType === 'shield' ? <Icon.Shield width={20} height={20}/> : item.iconType === 'boot' ? <Icon.Boot width={20} height={20}/> : <Icon.Heart width={20} height={20}/>}
-                </div>
-                <p className="text-[10px] font-black text-zinc-100 uppercase leading-none">{item.name}</p>
-                <p className="text-[8px] text-indigo-400 font-bold mt-1 uppercase">+{item.value} {item.stat === 'attack' ? 'Ataque' : item.stat === 'maxArmor' ? 'Escudo' : item.stat === 'speed' ? 'Velocidade' : 'Vida'}</p>
-                <p className="text-[11px] text-yellow-500 font-black mt-2">{item.price} G</p>
-              </button>
-            ))}
-          </div>
-          <div className="space-y-3">
-             <p className="text-[10px] font-black text-pink-500 uppercase tracking-widest text-center border-b border-pink-900/20 pb-1">Suprimentos</p>
-             <div className="grid grid-cols-3 gap-3">
-                {potions.map(p => (
-                   <div key={p.id} className="flex flex-col gap-2 bg-pink-900/5 p-3 rounded-2xl border border-pink-900/10">
-                      <div className="flex items-center justify-center text-pink-500 text-[11px] font-black">
-                        <Icon.Potion width={14} height={14} /> <span className="ml-1">{p.percent}%</span>
-                      </div>
-                      <div className="flex flex-col gap-1.5 mt-1">
-                        <button onClick={() => onBuyPotion(p as any, 'use')} disabled={gold < p.price} className="w-full py-1.5 bg-pink-600/10 text-pink-500 text-[8px] font-black rounded border border-pink-500/20 uppercase">USAR</button>
-                        <button onClick={() => onBuyPotion(p as any, 'store')} disabled={gold < p.price} className="w-full py-1.5 bg-zinc-800 text-zinc-400 text-[8px] font-black rounded uppercase">GUARDAR</button>
-                      </div>
-                      <p className="text-[9px] text-center text-yellow-500 font-black mt-1">{p.price} G</p>
-                   </div>
-                ))}
-             </div>
-          </div>
-          {!hasPet && (
-            <div className="space-y-3">
-               <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest text-center border-b border-orange-900/20 pb-1">Companheiros (10 G)</p>
-               <div className="grid grid-cols-3 gap-3">
-                  {(['LOBO', 'PUMA', 'CORVO'] as Pet['type'][]).map(type => (
-                    <button key={type} onClick={() => onBuyPet(type)} disabled={gold < 10} className="flex flex-col items-center gap-2 p-3 bg-orange-900/5 rounded-2xl border border-[#333] hover:border-orange-500 disabled:opacity-30">
-                      <span className="text-orange-500">{type === 'LOBO' ? <Icon.Wolf width={20} height={20}/> : type === 'PUMA' ? <Icon.Puma width={20} height={20}/> : <Icon.Corvo width={20} height={20}/>}</span>
-                      <span className="text-[9px] font-black text-zinc-400">{type}</span>
-                    </button>
-                  ))}
-               </div>
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto space-y-6 pr-2 no-scrollbar">
           <button disabled={gold < 25} onClick={onRentTron} className="w-full p-4 bg-cyan-950/10 border border-cyan-500/20 rounded-2xl flex items-center gap-4 hover:bg-cyan-900/10 transition-all disabled:opacity-30">
             <div className="text-cyan-500"><Icon.Horse width={24} height={24}/></div>
             <div className="flex-1 text-left">
-              <p className="text-[10px] font-black text-white uppercase tracking-tight">Cavalo Fantasma (15s)</p>
-              <p className="text-[8px] text-cyan-600 font-bold uppercase tracking-widest">Iniciativa Máxima + Rastro</p>
+              <p className="text-[10px] font-black text-white uppercase">Cavalo Fantasma (20s)</p>
+              <p className="text-[8px] text-cyan-600 font-bold uppercase">Iniciativa Máxima + Rastro</p>
             </div>
             <span className="text-[11px] text-yellow-500 font-black">25 G</span>
           </button>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {items.map(it => (
+              <button key={it.id} disabled={gold < it.price!} onClick={() => onBuyItem(it)} className="p-4 bg-[#1a1a1a] border border-[#333] rounded-2xl hover:border-indigo-500 disabled:opacity-30 transition-all text-left">
+                <div className="text-indigo-500 mb-2"><Icon.Sword /></div>
+                <p className="text-[10px] font-black text-zinc-100 uppercase">{it.name}</p>
+                <p className="text-[8px] text-indigo-400 font-bold uppercase">+{it.value} Atributo</p>
+                <p className="text-[11px] text-yellow-500 font-black mt-2">{it.price} G</p>
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {potions.map(p => (
+              <div key={p.id} className="p-3 bg-pink-900/5 rounded-2xl border border-pink-900/10 text-center space-y-2">
+                <div className="text-pink-500 text-[11px] font-black flex items-center justify-center gap-1"><Icon.Potion /> {p.percent}%</div>
+                <button onClick={() => onBuyPotion(p, 'use')} disabled={gold < p.price!} className="w-full py-1 bg-pink-600 text-white text-[8px] font-black rounded uppercase">USAR</button>
+                <button onClick={() => onBuyPotion(p, 'store')} disabled={gold < p.price!} className="w-full py-1 bg-zinc-800 text-zinc-400 text-[8px] font-black rounded uppercase">GUARDAR</button>
+                <p className="text-[9px] text-yellow-500 font-black">{p.price} G</p>
+              </div>
+            ))}
+          </div>
+          {!hasPet && (
+             <div className="grid grid-cols-3 gap-3">
+               {(['CACHORRO', 'LOBO', 'URSO'] as Pet['type'][]).map(type => (
+                 <button key={type} onClick={() => onBuyPet(type)} disabled={gold < (type === 'URSO' ? 15 : 10)} className="p-3 bg-orange-950/5 border border-[#333] rounded-2xl flex flex-col items-center gap-1">
+                   <div className="text-orange-500"><Icon.Wolf /></div>
+                   <span className="text-[8px] font-black">{type}</span>
+                   <span className="text-[9px] text-yellow-500 font-black">{type === 'URSO' ? 15 : 10} G</span>
+                 </button>
+               ))}
+             </div>
+          )}
         </div>
-        <button onClick={onClose} className="w-full py-5 bg-white text-black font-black rounded-2xl uppercase text-[11px] tracking-[0.2em] flex-shrink-0 active:scale-95 transition-all">Fechar Negócio</button>
+        <button onClick={onClose} className="w-full py-5 bg-white text-black font-black rounded-2xl uppercase text-[11px] tracking-[0.2em] active:scale-95 transition-all">Fechar Negócio</button>
+      </div>
+    </div>
+  );
+};
+
+export const ChestModal: React.FC<{ onChoice: (choice: StatChoice, extra: 'gold' | 'potion') => void, language: Language }> = ({ onChoice, language }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-6 backdrop-blur-md">
+      <div className="bg-[#111] border border-blue-600/50 max-w-sm w-full p-8 rounded-[3rem] text-center space-y-8 animate-in zoom-in-95">
+        <div className="text-blue-500 flex justify-center scale-[3] mb-4"><Icon.Chest /></div>
+        <h2 className="text-2xl font-black text-white uppercase tracking-tighter">{t.chest_title}</h2>
+        <div className="grid grid-cols-1 gap-3">
+          {(['Ataque', 'Armadura', 'Velocidade'] as StatChoice[]).map(choice => (
+            <button key={choice} onClick={() => onChoice(choice, Math.random() > 0.5 ? 'gold' : 'potion')} className="py-5 bg-[#1a1a1a] hover:bg-[#222] rounded-2xl border border-[#333] transition-all">
+              <span className="font-black text-[10px] uppercase tracking-[0.2em] text-white">
+                {choice} {choice === 'Ataque' ? '+5' : choice === 'Armadura' ? '+3' : '+4'}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const RelicSelectionModal: React.FC<{ options: Relic[], onSelect: (relic: Relic) => void, language: Language }> = ({ options, onSelect, language }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <div className="fixed inset-0 bg-black z-[130] flex flex-col items-center justify-center p-6 space-y-10 animate-in fade-in">
+      <h2 className="text-4xl font-black text-purple-500 tracking-tighter uppercase">{t.relic_choice}</h2>
+      <div className="grid grid-cols-1 gap-4 w-full max-w-sm">
+        {options.map(relic => (
+          <button key={relic.id} onClick={() => onSelect(relic)} className="p-6 bg-[#111] border border-[#222] rounded-[2.5rem] text-left hover:border-purple-500/50 flex items-center gap-6 transition-all group">
+            <div className="text-purple-500 group-hover:scale-110 transition-transform">{React.createElement((Icon as any)[relic.icon], { width: 32, height: 32 })}</div>
+            <div className="space-y-1">
+              <h4 className="text-[12px] font-black text-white uppercase">{relic.name}</h4>
+              <p className="text-[10px] text-zinc-500 font-mono leading-tight">{relic.description}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export const AltarInteractionModal: React.FC<{ active: boolean, onPray: () => void, onClose: () => void, language: Language }> = ({ active, onPray, onClose, language }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-6 backdrop-blur-md">
+      <div className={`bg-[#111] border p-8 rounded-[3.5rem] max-w-sm w-full text-center space-y-8 animate-in zoom-in-95 ${active ? 'border-purple-600/50 shadow-[0_0_80px_rgba(147,51,234,0.1)]' : 'border-[#222]'}`}>
+         <div className={`${active ? 'text-purple-500 animate-pulse' : 'text-zinc-800'} flex justify-center scale-[3.5] mb-6`}><Icon.Altar /></div>
+         <h3 className="text-2xl font-black text-white uppercase tracking-tighter leading-none">{t.altar_title}</h3>
+         <p className="text-zinc-500 text-[11px] font-bold leading-relaxed">{active ? t.altar_prompt : t.altar_inactive}</p>
+         <div className="flex flex-col gap-3 pt-4">
+            {active && <button onClick={onPray} className="w-full py-5 bg-purple-600 text-white font-black rounded-2xl uppercase text-[11px] tracking-[0.2em]">ORAR</button>}
+            <button onClick={onClose} className="w-full py-4 bg-[#1a1a1a] text-zinc-500 font-black rounded-2xl uppercase text-[10px] border border-[#333]">Sair</button>
+         </div>
+      </div>
+    </div>
+  );
+};
+
+export const AltarResultModal: React.FC<{ effect: AltarEffect, onClose: () => void, language: Language }> = ({ effect, onClose, language }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <div className="fixed inset-0 bg-black/98 flex items-center justify-center z-[140] p-6 backdrop-blur-3xl">
+      <div className={`bg-[#111] border-4 p-10 rounded-[4rem] max-w-sm w-full text-center space-y-10 animate-in zoom-in-95 ${effect.type === 'BLESSING' ? 'border-yellow-600/50' : 'border-purple-900/50'}`}>
+         <div className={`flex justify-center scale-[4] mb-4 ${effect.type === 'BLESSING' ? 'text-yellow-500' : 'text-purple-600'}`}><Icon.Altar /></div>
+         <h3 className="text-3xl font-black text-white uppercase tracking-tighter">{t[effect.nameKey]}</h3>
+         <p className="text-zinc-400 font-mono text-[11px] italic">{t[effect.descKey]}</p>
+         <button onClick={onClose} className="w-full py-6 bg-white text-black font-black rounded-[2.5rem] uppercase text-[11px] tracking-[0.3em]">PROSSEGUIR</button>
       </div>
     </div>
   );
@@ -373,27 +406,6 @@ export const TutorialModal: React.FC<{ onFinish: () => void, language: Language 
   );
 };
 
-export const ChestModal: React.FC<{ onChoice: (choice: StatChoice, extra: 'gold' | 'potion') => void, language: Language }> = ({ onChoice, language }) => {
-  const t = TRANSLATIONS[language];
-  return (
-    <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-6 backdrop-blur-md">
-      <div className="bg-[#111] border border-blue-600/50 max-w-sm w-full p-8 rounded-[3rem] text-center space-y-8 animate-in zoom-in-95 shadow-[0_0_50px_rgba(37,99,235,0.2)]">
-        <div className="text-blue-500 flex justify-center scale-[3] mb-4"><Icon.Chest /></div>
-        <h2 className="text-2xl font-black text-white uppercase tracking-tighter">{t.chest_title}</h2>
-        <div className="grid grid-cols-1 gap-3">
-          {(['Ataque', 'Armadura', 'Velocidade'] as StatChoice[]).map(choice => (
-            <button key={choice} onClick={() => onChoice(choice, Math.random() > 0.5 ? 'gold' : 'potion')} className="py-5 bg-[#1a1a1a] hover:bg-[#222] rounded-2xl border border-[#333] transition-all active:scale-95 group">
-              <span className="font-black text-[10px] uppercase tracking-[0.2em] text-white group-hover:text-blue-400">
-                {choice} {choice === 'Ataque' ? '+5' : choice === 'Armadura' ? '+3' : '+4'}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export const PotionPickupModal: React.FC<{ potion: PotionEntity, onChoice: (mode: 'use' | 'store') => void, language: Language }> = ({ potion, onChoice, language }) => {
   const t = TRANSLATIONS[language];
   return (
@@ -406,65 +418,6 @@ export const PotionPickupModal: React.FC<{ potion: PotionEntity, onChoice: (mode
            <button onClick={() => onChoice('use')} className="w-full py-4 bg-pink-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-[0.2em] active:scale-95 shadow-lg shadow-pink-900/20">{t.use}</button>
            <button onClick={() => onChoice('store')} className="w-full py-4 bg-[#1a1a1a] text-zinc-400 font-black rounded-2xl uppercase text-[10px] tracking-[0.2em] border border-[#333] active:scale-95">{t.store}</button>
          </div>
-      </div>
-    </div>
-  );
-};
-
-export const RelicSelectionModal: React.FC<{ options: Relic[], onSelect: (relic: Relic) => void, language: Language }> = ({ options, onSelect, language }) => {
-  const t = TRANSLATIONS[language];
-  return (
-    <div className="fixed inset-0 bg-black z-[130] flex flex-col items-center justify-center p-6 space-y-10 animate-in fade-in">
-      <div className="text-center space-y-3">
-        <h2 className="text-4xl font-black text-purple-500 tracking-tighter uppercase leading-none">{t.relic_choice}</h2>
-        <p className="text-zinc-600 font-bold text-[10px] uppercase tracking-[0.3em]">Escolha o seu legado eterno</p>
-      </div>
-      <div className="grid grid-cols-1 gap-4 w-full max-w-sm">
-        {options.map(relic => (
-          <button key={relic.id} onClick={() => onSelect(relic)} className="p-6 bg-[#111] border border-[#222] rounded-[2.5rem] text-left hover:border-purple-500/50 flex items-center gap-6 transition-all active:scale-95 group">
-            <div className="text-purple-500 group-hover:scale-110 transition-transform">{React.createElement((Icon as any)[relic.icon], { width: 32, height: 32 })}</div>
-            <div className="space-y-1">
-              <h4 className="text-[12px] font-black text-white uppercase tracking-tight">{relic.name}</h4>
-              <p className="text-[10px] text-zinc-500 font-mono leading-tight">{relic.description}</p>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-export const AltarInteractionModal: React.FC<{ active: boolean, onPray: () => void, onClose: () => void, language: Language }> = ({ active, onPray, onClose, language }) => {
-  const t = TRANSLATIONS[language];
-  return (
-    <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-6 backdrop-blur-md">
-      <div className={`bg-[#111] border p-8 rounded-[3.5rem] max-w-sm w-full text-center space-y-8 animate-in zoom-in-95 transition-all ${active ? 'border-purple-600/50 shadow-[0_0_80px_rgba(147,51,234,0.1)]' : 'border-[#222] opacity-60'}`}>
-         <div className={`${active ? 'text-purple-500 animate-pulse' : 'text-zinc-800'} flex justify-center scale-[3.5] mb-6`}><Icon.Altar /></div>
-         <div className="space-y-3">
-            <h3 className="text-2xl font-black text-white uppercase tracking-tighter leading-none">{t.altar_title}</h3>
-            <p className="text-zinc-500 text-[11px] font-bold leading-relaxed">{active ? t.altar_prompt : t.altar_inactive}</p>
-         </div>
-         <div className="flex flex-col gap-3 pt-4">
-            {active && <button onClick={onPray} className="w-full py-5 bg-purple-600 text-white font-black rounded-2xl uppercase text-[11px] tracking-[0.2em] shadow-lg shadow-purple-900/20 active:scale-95 transition-all">ORAR</button>}
-            <button onClick={onClose} className="w-full py-4 bg-[#1a1a1a] text-zinc-500 font-black rounded-2xl uppercase text-[10px] border border-[#333] active:scale-95 transition-all">Sair</button>
-         </div>
-      </div>
-    </div>
-  );
-};
-
-export const AltarResultModal: React.FC<{ effect: AltarEffect, onClose: () => void, language: Language }> = ({ effect, onClose, language }) => {
-  const t = TRANSLATIONS[language];
-  const isBlessing = effect.type === 'BLESSING';
-  return (
-    <div className="fixed inset-0 bg-black/98 flex items-center justify-center z-[140] p-6 backdrop-blur-3xl">
-      <div className={`bg-[#111] border-4 p-10 rounded-[4rem] max-w-sm w-full text-center space-y-10 animate-in zoom-in-95 shadow-2xl ${isBlessing ? 'border-yellow-600/50' : 'border-purple-900/50'}`}>
-         <div className={`flex justify-center scale-[4] mb-4 ${isBlessing ? 'text-yellow-500' : 'text-purple-600'}`}><Icon.Altar /></div>
-         <div className="space-y-4">
-            <h3 className="text-3xl font-black text-white uppercase tracking-tighter leading-none">{t[effect.nameKey]}</h3>
-            <p className="text-zinc-400 font-mono text-[11px] leading-relaxed italic">{t[effect.descKey]}</p>
-         </div>
-         <button onClick={onClose} className={`w-full py-6 font-black rounded-[2.5rem] uppercase text-[11px] tracking-[0.3em] active:scale-95 transition-all ${isBlessing ? 'bg-yellow-600 text-black shadow-lg shadow-yellow-900/20' : 'bg-zinc-800 text-zinc-300 shadow-lg shadow-black/50'}`}>PROSSEGUIR</button>
       </div>
     </div>
   );
