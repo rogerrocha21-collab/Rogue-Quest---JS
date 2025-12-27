@@ -236,7 +236,6 @@ const App: React.FC = () => {
         activePet: updatedPet, 
         currentEnemy: undefined,
         keyPath: undefined,
-        // Limpa efeito de "Próximo ataque dobrado" após luta se usado
         activeAltarEffect: prev.activeAltarEffect?.id === 'anxious_strike' ? undefined : prev.activeAltarEffect
       };
       saveGame(updated);
@@ -249,33 +248,23 @@ const App: React.FC = () => {
     let used = false;
     setGameState(prev => {
       if (!prev || !prev.inventory[idx]) return prev;
-      
-      // Maldição: Oferta Negada
       if (prev.activeAltarEffect?.id === 'denied_offering') {
         const newInv = [...prev.inventory];
         newInv.splice(idx, 1);
         used = true;
         return { ...prev, activeAltarEffect: undefined, inventory: newInv } as GameState;
       }
-
       const pot = prev.inventory[idx];
       const stats = { ...prev.playerStats };
       let boost = pot.percent;
-      
-      // Relíquia: Alquimia (+5% cura)
       if (prev.activeRelic?.id === 'alch') boost += 5;
-      // Maldição: Sede Profana (-10% cura)
       if (prev.activeAltarEffect?.id === 'profane_thirst') boost -= 10;
-      
       const heal = Math.floor(stats.maxHp * (boost / 100));
       stats.hp = Math.min(stats.maxHp, stats.hp + heal);
-      
       const newInv = [...prev.inventory];
-      // Bênção: Oferta Aceita (Próxima poção não é consumida)
       if (prev.activeAltarEffect?.id !== 'accepted_offering') {
         newInv.splice(idx, 1);
       }
-      
       used = true;
       return { 
         ...prev, 
@@ -461,19 +450,14 @@ const App: React.FC = () => {
                 const pool = isLucky ? BLESSINGS_POOL : CURSES_POOL;
                 const effect = pool[Math.floor(Math.random() * pool.length)];
                 let playerStats = { ...prev.playerStats };
-                
-                // Aplicação imediata de alguns efeitos
                 if (effect.id === 'anxious_strike') playerStats.attack = Math.floor(playerStats.attack * 2); 
-                
                 let keyPath: Position[] | undefined = undefined;
                 if (effect.id === 'open_eyes' && prev.keyPos) {
                     const path = findDungeonPath(prev.playerPos, prev.keyPos, prev.map, prev.enemies);
                     if (path) keyPath = path;
                 }
-
                 let inventorySize = prev.inventorySize;
                 if (effect.id === 'less_weight') inventorySize = Math.max(1, inventorySize - 2);
-
                 return { 
                     ...prev, 
                     gameStatus: 'ALTAR_RESULT' as const, 
