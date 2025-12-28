@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { GameState, Position, EntityStats, StatChoice, PotionEntity, Pet, Language, Relic, AltarEffect } from './types';
 import { INITIAL_PLAYER_STATS, MAP_WIDTH, MAP_HEIGHT, TRANSLATIONS, RELICS_POOL, THEME_CONFIG, MAX_LEVELS, BLESSINGS_POOL, CURSES_POOL } from './constants';
 import { generateDungeon, findDungeonPath } from './utils/dungeon';
@@ -575,6 +576,7 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+      <SpeedInsights />
     </div>
   );
 };
