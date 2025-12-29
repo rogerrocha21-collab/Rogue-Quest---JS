@@ -102,6 +102,10 @@ export interface GameState {
   activeAltarEffect?: AltarEffect;
   hasUsedAltarInLevel: boolean;
   keyPath?: Position[];
+  hasCompass?: boolean;
+  hasMap?: boolean;
+  compassPath?: Position[];
+  mapPath?: Position[];
 }
 
 export type StatChoice = 'Ataque' | 'Armadura' | 'Velocidade';

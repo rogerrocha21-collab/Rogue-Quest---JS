@@ -21,9 +21,16 @@ interface HUDProps {
   onUsePotion: (idx: number) => void;
   tronModeActive?: boolean;
   tronTimeLeft?: number;
+  hasCompass?: boolean;
+  hasMap?: boolean;
+  enemiesCount?: number;
 }
 
-const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, playerName, activePet, language = 'PT', inventory, inventorySize, activeRelic, activeAltarEffect, onUsePotion, tronModeActive, tronTimeLeft }) => {
+const HUD: React.FC<HUDProps> = ({ 
+  level, stats, logs, hasKey, kills, gold, playerName, activePet, language = 'PT', 
+  inventory, inventorySize, activeRelic, activeAltarEffect, onUsePotion, 
+  tronModeActive, tronTimeLeft, hasCompass, hasMap, enemiesCount 
+}) => {
   const [showLogs, setShowLogs] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [relicTooltip, setRelicTooltip] = useState(false);
@@ -98,7 +105,9 @@ const HUD: React.FC<HUDProps> = ({ level, stats, logs, hasKey, kills, gold, play
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
               {activeRelic && <button onClick={() => setRelicTooltip(true)} className="text-purple-400 animate-pulse">{React.createElement((Icon as any)[activeRelic.icon], { width: 14, height: 14 })}</button>}
               {activeAltarEffect && <button onClick={() => setEffectTooltip(true)} className={`transition-transform hover:scale-110 ${activeAltarEffect.type === 'BLESSING' ? 'text-yellow-500' : 'text-purple-600'}`}><Icon.Altar width={14} height={14} /></button>}
-              {!activeRelic && !activeAltarEffect && <span className="text-[7px] text-zinc-700 font-bold uppercase">NENHUM EFEITO</span>}
+              {hasCompass && <div className="text-cyan-400 animate-pulse flex items-center gap-1"><Icon.Compass width={14} height={14} /><span className="text-[8px] font-bold">{enemiesCount}</span></div>}
+              {hasMap && <div className="text-emerald-500 animate-pulse"><Icon.Map width={14} height={14} /></div>}
+              {!activeRelic && !activeAltarEffect && !hasCompass && !hasMap && <span className="text-[7px] text-zinc-700 font-bold uppercase">NENHUM EFEITO</span>}
             </div>
           </div>
           <button onClick={() => setShowLogs(!showLogs)} className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[9px] font-bold text-zinc-300 transition-colors uppercase">{showLogs ? t.hide_diary : t.view_diary}</button>

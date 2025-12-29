@@ -156,5 +156,11 @@ export const Icon = {
   ),
   FlagES: () => (
     <svg viewBox="0 0 32 24" width="24" height="18"><rect width="32" height="24" fill="#aa151b"/><rect y="6" width="32" height="12" fill="#ffc400"/><rect y="18" width="32" height="6" fill="#aa151b"/></svg>
+  ),
+  Compass: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" width={props.width || "16"} height={props.height || "16"} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+  ),
+  Map: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" width={props.width || "16"} height={props.height || "16"} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
   )
 };

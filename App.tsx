@@ -40,6 +40,31 @@ const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [gameState?.tronModeActive]);
 
+  const updateGuides = (state: GameState, pos: Position): { compass: Position[], map: Position[] } => {
+     let compass: Position[] = [];
+     let mapP: Position[] = [];
+
+     if (state.hasCompass && state.enemies.length > 0) {
+         let closestEnemy = state.enemies[0];
+         let minLen = Infinity;
+         let bestPath = null;
+         for (const enemy of state.enemies) {
+             const path = findDungeonPath(pos, enemy, state.map, state.enemies); // Pass enemies to avoid blocking check issues if needed, mostly fine
+             if (path && path.length < minLen) {
+                 minLen = path.length;
+                 bestPath = path;
+             }
+         }
+         if (bestPath) compass = bestPath;
+     }
+
+     if (state.hasMap) {
+         const path = findDungeonPath(pos, state.stairsPos, state.map, state.enemies);
+         if (path) mapP = path;
+     }
+     return { compass, map: mapP };
+  };
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('rq_save_v150_final');
@@ -57,7 +82,7 @@ const App: React.FC = () => {
           potions: [], items: [], hasKey: false, enemiesKilledInLevel: 0,
           stairsPos: {x:0,y:0}, gameStatus: 'START_SCREEN' as const, logs: [],
           tronModeActive: false, tronTimeLeft: 0, tronTrail: [], language: 'PT',
-          inventory: [], inventorySize: 5, hasUsedAltarInLevel: false
+          inventory: [], inventorySize: 5, hasUsedAltarInLevel: false, hasCompass: false, hasMap: false
         });
         playerPosRef.current = initialPos;
         setIsNewGameMode(true);
@@ -137,27 +162,58 @@ const App: React.FC = () => {
     let invSize = 5;
     let startInventory = inventory || [];
     
-    if (level === 1) {
-        if (activeRelic?.id === 'slots') invSize = 10;
-        if (activeRelic?.id === 'gaze') startInventory.push({ id: 'relic-potion', percent: 75, x: 0, y: 0 });
-        if (activeRelic?.id === 'mark') { currentGold += 60; currentStats.maxHp = Math.floor(currentStats.maxHp * 0.9); currentStats.hp = currentStats.maxHp; }
-        if (activeRelic?.id === 'heart') { currentStats.attack = Math.floor(currentStats.attack * 1.1); currentStats.maxHp = Math.floor(currentStats.maxHp * 0.95); currentStats.hp = Math.min(currentStats.hp, currentStats.maxHp); }
-        if (activeRelic?.id === 'life_long') { currentStats.maxHp += 30; currentStats.hp = currentStats.maxHp; }
-    } else {
-        if (activeRelic?.id === 'slots') invSize = 10;
-    }
+    // Preserve existing compass/map state if re-generating or moving levels, but initLevel is usually called with fresh params or carried over.
+    // If we are calling this from App start, gameState is null, so rely on defaults.
+    // If calling from next level, we rely on state closure but initLevel takes arguments. 
+    // We should ensure compass/map are preserved in the arguments or state update logic.
+    // Actually, initLevel is called with specific params. We need to preserve hasCompass/hasMap from previous state if available.
+    // However, initLevel here resets state. We need to be careful. 
+    // The current implementation of initLevel replaces state. We need to pass hasCompass/hasMap or merge.
+    // Let's modify initLevel to check current state for persistence if not explicitly provided, OR rely on the fact that we will update state with prev values.
+    // BUT initLevel wipes everything. So we must grab values from 'gameState' ref or pass them.
+    // Since initLevel is memoized and used in callbacks, accessing 'gameState' directly inside might be stale if not careful, but 'setGameState' callback is safe.
+    // Better approach: InitLevel is called with explicit params. We should probably modify the call sites to pass these, OR update initLevel to merge.
+    
+    // Let's assume for now we patch initLevel to take these or we just update the setGameState to merge persistent flags.
+    
+    setGameState(prev => {
+        let finalHasCompass = prev?.hasCompass || false;
+        let finalHasMap = prev?.hasMap || false;
 
-    const finalPlayerName = name || nameInput;
-    const newState: GameState = {
-      ...dungeon, playerName: finalPlayerName, gold: currentGold, level, playerStats: currentStats, items: [], hasKey: false, enemiesKilledInLevel: 0,
-      gameStatus: (level === 1 && !stats) ? 'TUTORIAL' as const : 'PLAYING' as const,
-      logs: (level === 1 && !stats) ? [`${finalPlayerName} entrou no abismo.`] : [`Descendo para o nível ${level}`],
-      inventory: startInventory, inventorySize: invSize, activePet, activeRelic, language: currentLang, hasUsedAltarInLevel: false, tronModeActive: false, tronTimeLeft: 0, tronTrail: [],
-      activeAltarEffect: undefined, keyPath: undefined 
-    };
-    playerPosRef.current = newState.playerPos;
-    setGameState(newState);
-    saveGame(newState); 
+        if (level === 1) {
+            if (activeRelic?.id === 'slots') invSize = 10;
+            if (activeRelic?.id === 'gaze') startInventory.push({ id: 'relic-potion', percent: 75, x: 0, y: 0 });
+            if (activeRelic?.id === 'mark') { currentGold += 60; currentStats.maxHp = Math.floor(currentStats.maxHp * 0.9); currentStats.hp = currentStats.maxHp; }
+            if (activeRelic?.id === 'heart') { currentStats.attack = Math.floor(currentStats.attack * 1.1); currentStats.maxHp = Math.floor(currentStats.maxHp * 0.95); currentStats.hp = Math.min(currentStats.hp, currentStats.maxHp); }
+            if (activeRelic?.id === 'life_long') { currentStats.maxHp += 30; currentStats.hp = currentStats.maxHp; }
+            // Reset permanent items on level 1 (New Run)
+            if (!prev || prev.gameStatus === 'WON' || prev.gameStatus === 'LOST' || level === 1) {
+               finalHasCompass = false;
+               finalHasMap = false;
+            }
+        } else {
+            if (activeRelic?.id === 'slots') invSize = 10;
+        }
+
+        const finalPlayerName = name || nameInput;
+        const tempState: GameState = {
+          ...dungeon, playerName: finalPlayerName, gold: currentGold, level, playerStats: currentStats, items: [], hasKey: false, enemiesKilledInLevel: 0,
+          gameStatus: (level === 1 && !stats) ? 'TUTORIAL' as const : 'PLAYING' as const,
+          logs: (level === 1 && !stats) ? [`${finalPlayerName} entrou no abismo.`] : [`Descendo para o nível ${level}`],
+          inventory: startInventory, inventorySize: invSize, activePet, activeRelic, language: currentLang, hasUsedAltarInLevel: false, tronModeActive: false, tronTimeLeft: 0, tronTrail: [],
+          activeAltarEffect: undefined, keyPath: undefined,
+          hasCompass: finalHasCompass, hasMap: finalHasMap
+        };
+
+        // Calculate initial guides
+        const guides = updateGuides(tempState, tempState.playerPos);
+        tempState.compassPath = guides.compass;
+        tempState.mapPath = guides.map;
+
+        playerPosRef.current = tempState.playerPos;
+        saveGame(tempState);
+        return tempState;
+    });
     setMoveQueue([]);
   }, [nameInput, currentLang, saveGame]);
 
@@ -215,7 +271,11 @@ const App: React.FC = () => {
         playerPosRef.current = nextPos;
         let newTrail = prev.tronTrail || [];
         if (prev.tronModeActive) newTrail = [...newTrail, oldPos].slice(-10);
-        return { ...prev, playerPos: nextPos, activePet: updatedPet, tronTrail: newTrail } as GameState;
+
+        // Update Guides
+        const guides = updateGuides(prev, nextPos);
+        
+        return { ...prev, playerPos: nextPos, activePet: updatedPet, tronTrail: newTrail, compassPath: guides.compass, mapPath: guides.map } as GameState;
       });
     };
     const speed = gameState.tronModeActive ? 40 : 80;
@@ -246,10 +306,17 @@ const App: React.FC = () => {
       }
 
       playCoinSound();
+      const newEnemies = prev.enemies.filter(e => e.id !== prev.currentEnemy?.id);
+      
+      // Update compass after kill
+      const tempState = { ...prev, enemies: newEnemies };
+      const guides = updateGuides(tempState, prev.playerPos);
+
       const updated: GameState = {
         ...prev, playerStats: nextStats, gold: prev.gold + finalGold, gameStatus: 'PLAYING' as const,
-        enemies: prev.enemies.filter(e => e.id !== prev.currentEnemy?.id),
+        enemies: newEnemies,
         enemiesKilledInLevel: prev.enemiesKilledInLevel + 1, activePet: updatedPet, currentEnemy: undefined, keyPath: undefined,
+        compassPath: guides.compass, mapPath: guides.map
       };
       saveGame(updated);
       return updated;
@@ -405,8 +472,11 @@ const App: React.FC = () => {
               <GameMap 
                 map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} keyPath={gameState.keyPath} onTileClick={handleTileClick} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} 
                 ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'}
+                compassPath={gameState.compassPath} mapPath={gameState.mapPath}
               />
-              <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}/>
+              <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}
+                hasCompass={gameState.hasCompass} hasMap={gameState.hasMap} enemiesCount={gameState.enemies.length}
+              />
             </div>
           )}
         </div>
@@ -545,6 +615,7 @@ const App: React.FC = () => {
         <MerchantShopModal 
           gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} 
           language={currentLang} activeAltarEffect={gameState.activeAltarEffect} 
+          hasCompass={gameState.hasCompass} hasMap={gameState.hasMap}
           onBuyItem={(item) => {
             setGameState(prev => {
               if(!prev) return prev;
@@ -565,6 +636,23 @@ const App: React.FC = () => {
             }
           }} 
           onRentTron={() => setGameState(prev => prev ? { ...prev, gold: prev.gold - 25, tronModeActive: true, tronTimeLeft: 20, gameStatus: 'PLAYING' as const } as GameState : null)} 
+          onBuyCompass={() => {
+             setGameState(prev => {
+                 if (!prev) return prev;
+                 // Calc guides
+                 const tempState = { ...prev, gold: prev.gold - 90, hasCompass: true };
+                 const guides = updateGuides(tempState, prev.playerPos);
+                 return { ...tempState, compassPath: guides.compass, mapPath: guides.map } as GameState;
+             });
+          }}
+          onBuyMap={() => {
+             setGameState(prev => {
+                 if (!prev) return prev;
+                 const tempState = { ...prev, gold: prev.gold - 90, hasMap: true };
+                 const guides = updateGuides(tempState, prev.playerPos);
+                 return { ...tempState, compassPath: guides.compass, mapPath: guides.map } as GameState;
+             });
+          }}
           onBuyPet={(type) => {
             const pet: Pet = { type, name: type, hp: 50, maxHp: 50, pos: { ...playerPosRef.current } };
             setGameState(prev => prev ? { ...prev, gold: prev.gold - (type === 'URSO' ? 15 : 10), activePet: pet } as GameState : null);

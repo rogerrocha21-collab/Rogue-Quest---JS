@@ -22,6 +22,8 @@ interface GameMapProps {
   activePet?: Pet;
   ritualDarkness?: boolean;
   keyPath?: Position[];
+  compassPath?: Position[];
+  mapPath?: Position[];
   onTileClick: (x: number, y: number) => void;
 }
 
@@ -32,7 +34,7 @@ const GameMap: React.FC<GameMapProps> = ({
   map, theme, playerPos, enemies, chests, potions, items, 
   keyPos, merchantPos, altarPos, hasKey, stairsPos, 
   tronModeActive, tronTrail = [], activePet, 
-  ritualDarkness, keyPath = [], onTileClick 
+  ritualDarkness, keyPath = [], compassPath = [], mapPath = [], onTileClick 
 }) => {
   const config = THEME_CONFIG[theme] || THEME_CONFIG.VOID;
 
@@ -58,6 +60,8 @@ const GameMap: React.FC<GameMapProps> = ({
     const isStairs = x === stairsPos.x && y === stairsPos.y;
     const isTrail = tronModeActive && tronTrail.some(tp => tp.x === x && tp.y === y);
     const isKeyPath = !hasKey && keyPath.some(kp => kp.x === x && kp.y === y);
+    const isCompassPath = compassPath.some(cp => cp.x === x && cp.y === y);
+    const isMapPath = mapPath.some(mp => mp.x === x && mp.y === y);
 
     // Lógica da Maldição Escuridão Ritual
     let fogOpacity = "opacity-100";
@@ -97,6 +101,10 @@ const GameMap: React.FC<GameMapProps> = ({
           <span className={`${TILE_COLORS.STAIRS} animate-pulse scale-110 z-10`}><Icon.Stairs /></span>
         ) : isKeyPath ? (
            <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_yellow] z-0" />
+        ) : isCompassPath ? (
+           <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_red] z-0 opacity-60" />
+        ) : isMapPath ? (
+           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_green] z-0 opacity-60" />
         ) : isTrail ? (
           <div className="w-full h-full bg-cyan-400/20 animate-pulse flex items-center justify-center">
             <div className="w-full h-full border border-cyan-400/30 shadow-[0_0_10px_#22d3ee]" />

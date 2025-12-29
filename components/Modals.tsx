@@ -231,8 +231,14 @@ export const CombatModal: React.FC<CombatModalProps> = ({
   );
 };
 
-export const MerchantShopModal: React.FC<{ gold: number, level: number, hasPet: boolean, language: Language, activeAltarEffect?: AltarEffect, onBuyItem: (item: ItemEntity) => void, onBuyPotion: (pot: PotionEntity, choice: 'use' | 'store') => void, onRentTron: () => void, onBuyPet: (type: Pet['type']) => void, onClose: () => void }> = ({
-  gold, level, hasPet, language, activeAltarEffect, onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose
+export const MerchantShopModal: React.FC<{ 
+  gold: number, level: number, hasPet: boolean, language: Language, activeAltarEffect?: AltarEffect, 
+  onBuyItem: (item: ItemEntity) => void, onBuyPotion: (pot: PotionEntity, choice: 'use' | 'store') => void, 
+  onRentTron: () => void, onBuyPet: (type: Pet['type']) => void, onClose: () => void,
+  hasCompass?: boolean, hasMap?: boolean, onBuyCompass?: () => void, onBuyMap?: () => void
+}> = ({
+  gold, level, hasPet, language, activeAltarEffect, onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose,
+  hasCompass, hasMap, onBuyCompass, onBuyMap
 }) => {
   const t = TRANSLATIONS[language];
   const discount = activeAltarEffect?.id === 'merchant_blessing' ? 0.8 : 1.0;
@@ -268,6 +274,26 @@ export const MerchantShopModal: React.FC<{ gold: number, level: number, hasPet: 
             </div>
             <span className="text-[11px] text-yellow-500 font-black">25 G</span>
           </button>
+          
+          <div className="grid grid-cols-2 gap-3">
+             <button disabled={gold < 90 || hasCompass} onClick={onBuyCompass} className={`p-4 bg-cyan-950/10 border border-cyan-500/20 rounded-2xl flex items-center gap-3 transition-all ${hasCompass ? 'opacity-50' : 'hover:bg-cyan-900/10'} disabled:opacity-30`}>
+                <div className="text-cyan-400"><Icon.Compass width={20} height={20}/></div>
+                <div className="flex-1 text-left">
+                    <p className="text-[10px] font-black text-white uppercase">{t.compass_name}</p>
+                    <p className="text-[8px] text-cyan-600 font-bold uppercase">{t.compass_desc}</p>
+                </div>
+                {!hasCompass ? <span className="text-[11px] text-yellow-500 font-black">90 G</span> : <span className="text-[8px] text-green-500 font-bold">OK</span>}
+             </button>
+             <button disabled={gold < 90 || hasMap} onClick={onBuyMap} className={`p-4 bg-emerald-950/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3 transition-all ${hasMap ? 'opacity-50' : 'hover:bg-emerald-900/10'} disabled:opacity-30`}>
+                <div className="text-emerald-500"><Icon.Map width={20} height={20}/></div>
+                <div className="flex-1 text-left">
+                    <p className="text-[10px] font-black text-white uppercase">{t.map_name}</p>
+                    <p className="text-[8px] text-emerald-600 font-bold uppercase">{t.map_desc}</p>
+                </div>
+                {!hasMap ? <span className="text-[11px] text-yellow-500 font-black">90 G</span> : <span className="text-[8px] text-green-500 font-bold">OK</span>}
+             </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {items.map(it => (
               <button key={it.id} disabled={gold < it.price!} onClick={() => onBuyItem(it)} className="p-4 bg-[#1a1a1a] border border-[#333] rounded-2xl hover:border-indigo-500 disabled:opacity-30 transition-all text-left">
@@ -387,20 +413,20 @@ export const TutorialModal: React.FC<{ onFinish: () => void, language: Language 
           <div className="w-20 h-20 bg-red-950/30 border-2 border-red-600 rounded-[2rem] flex items-center justify-center text-red-500 mx-auto animate-pulse">
             <Icon.Player width={40} height={40} />
           </div>
-          <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">BEM-VINDO AO ABISMO</h2>
+          <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">{t.tutorial_title}</h2>
           <div className="bg-[#111] border border-[#222] p-8 rounded-[2.5rem] text-zinc-400 font-mono text-[11px] leading-relaxed text-left space-y-6 shadow-2xl">
-            <p className="text-white border-b border-[#222] pb-3 font-black uppercase tracking-widest">Guia de Sobrevivência:</p>
-            <p className="flex gap-3"><span className="text-red-500 font-black">❤️</span> <span><strong className="text-white">VIDA:</strong> Mantenha acima de 0 ou sua run termina.</span></p>
-            <p className="flex gap-3"><span className="text-yellow-400 font-black">⚔️</span> <span><strong className="text-white">ATAQUE:</strong> Dano causado por golpe automático.</span></p>
-            <p className="flex gap-3"><span className="text-blue-500 font-black">🛡️</span> <span><strong className="text-white">ESCUDO:</strong> Protege sua vida e regenera após cada luta.</span></p>
-            <p className="flex gap-3"><span className="text-green-500 font-black">🥾</span> <span><strong className="text-white">VELOCIDADE:</strong> Define quem golpeia primeiro.</span></p>
+            <p className="text-white border-b border-[#222] pb-3 font-black uppercase tracking-widest">{t.tutorial_guide_title}</p>
+            <p className="flex gap-3"><span className="text-red-500 font-black">❤️</span> <span><strong className="text-white">{t.tutorial_hp}:</strong> {t.tutorial_hp_desc}</span></p>
+            <p className="flex gap-3"><span className="text-yellow-400 font-black">⚔️</span> <span><strong className="text-white">{t.tutorial_atk}:</strong> {t.tutorial_atk_desc}</span></p>
+            <p className="flex gap-3"><span className="text-blue-500 font-black">🛡️</span> <span><strong className="text-white">{t.tutorial_def}:</strong> {t.tutorial_def_desc}</span></p>
+            <p className="flex gap-3"><span className="text-green-500 font-black">🥾</span> <span><strong className="text-white">{t.tutorial_spd}:</strong> {t.tutorial_spd_desc}</span></p>
             <div className="pt-4 border-t border-[#222]">
-               <p className="text-orange-500 font-black uppercase text-[10px] mb-2 tracking-widest">🩸 A PROVAÇÃO</p>
-               <p className="italic opacity-80">As escadas estão lacradas. Mate ao menos um inimigo e pegue a chave para avançar.</p>
+               <p className="text-orange-500 font-black uppercase text-[10px] mb-2 tracking-widest">🩸 {t.tutorial_trial_title}</p>
+               <p className="italic opacity-80">{t.tutorial_trial_desc}</p>
             </div>
           </div>
         </div>
-        <button onClick={onFinish} className="w-full py-6 bg-red-600 hover:bg-red-500 text-white font-black rounded-[2.5rem] uppercase tracking-[0.2em] text-xs shadow-2xl transition-all active:scale-95">ESTOU PRONTO</button>
+        <button onClick={onFinish} className="w-full py-6 bg-red-600 hover:bg-red-500 text-white font-black rounded-[2.5rem] uppercase tracking-[0.2em] text-xs shadow-2xl transition-all active:scale-95">{t.tutorial_btn}</button>
       </div>
     </div>
   );
