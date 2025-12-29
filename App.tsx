@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameState, Position, EntityStats, StatChoice, PotionEntity, Pet, Language, Relic, AltarEffect } from './types';
 import { INITIAL_PLAYER_STATS, MAP_WIDTH, MAP_HEIGHT, TRANSLATIONS, RELICS_POOL, THEME_CONFIG, MAX_LEVELS, BLESSINGS_POOL, CURSES_POOL } from './constants';
@@ -72,6 +73,16 @@ const App: React.FC = () => {
       localStorage.setItem('rq_save_v150_final', JSON.stringify({ ...state, language: currentLang }));
     } catch (e) {}
   }, [currentLang]);
+
+  const changeLanguage = (lang: Language) => {
+    setCurrentLang(lang);
+    if (gameState) {
+      const newState = { ...gameState, language: lang };
+      try {
+        localStorage.setItem('rq_save_v150_final', JSON.stringify(newState));
+      } catch (e) {}
+    }
+  };
 
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.PT;
 
@@ -176,7 +187,6 @@ const App: React.FC = () => {
           return { ...prev, gameStatus: 'COMBAT' as const, currentEnemy: enemy } as GameState; 
         }
         
-        // Fix: Use 'nextPos.x' and 'nextPos.y' instead of undefined 'x' and 'y'
         const chest = prev.chests.find(c => c.x === nextPos.x && c.y === nextPos.y);
         if (chest) { setMoveQueue([]); return { ...prev, gameStatus: 'CHEST_OPEN' as const, chests: prev.chests.filter(c => c.id !== chest.id) } as GameState; }
         
@@ -339,12 +349,34 @@ const App: React.FC = () => {
                   <button onClick={() => { startMusic(); setGameState({ ...gameState, gameStatus: 'PLAYING' as const }); }} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest shadow-xl transition-all transform active:scale-95">{t.continue_journey}</button>
                   <button onClick={() => setIsNewGameMode(true)} className="w-full bg-[#1e1e1e] hover:bg-[#2a2a2a] py-5 rounded-2xl text-zinc-500 font-mono font-bold text-[10px] uppercase tracking-widest transition-all">{t.new_game}</button>
                   <button onClick={() => window.open('https://t.me/ComunidadeRQ/27', '_blank')} className="w-full bg-zinc-900 border-2 border-zinc-800 text-zinc-500 rounded-2xl py-4 font-mono font-bold text-[9px] uppercase tracking-widest hover:text-white transition-all">Feedback</button>
+                  <div className="flex justify-center gap-3 pt-2">
+                    <button onClick={() => changeLanguage('PT')} className={`p-3 rounded-xl border-2 transition-all ${currentLang === 'PT' ? 'border-green-600 bg-green-900/20 scale-110 shadow-lg shadow-green-900/20' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-600 hover:bg-zinc-800 text-zinc-600'}`} title="Português">
+                      <Icon.FlagBR />
+                    </button>
+                    <button onClick={() => changeLanguage('EN')} className={`p-3 rounded-xl border-2 transition-all ${currentLang === 'EN' ? 'border-blue-600 bg-blue-900/20 scale-110 shadow-lg shadow-blue-900/20' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-600 hover:bg-zinc-800 text-zinc-600'}`} title="English">
+                      <Icon.FlagUS />
+                    </button>
+                    <button onClick={() => changeLanguage('ES')} className={`p-3 rounded-xl border-2 transition-all ${currentLang === 'ES' ? 'border-yellow-600 bg-yellow-900/20 scale-110 shadow-lg shadow-yellow-900/20' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-600 hover:bg-zinc-800 text-zinc-600'}`} title="Español">
+                      <Icon.FlagES />
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-6">
                   <input type="text" maxLength={12} placeholder={t.hero_placeholder} value={nameInput} onChange={e => setNameInput(e.target.value.toUpperCase())} className="w-full bg-[#0a0a0a] border-2 border-zinc-800 rounded-2xl py-5 px-6 text-center font-mono text-white focus:border-red-600 transition-all outline-none"/>
                   <button onClick={() => { if(!nameInput.trim()) return; startMusic(); initLevel(1, undefined, 0, nameInput); }} disabled={!nameInput.trim()} className="w-full bg-red-800 hover:bg-red-700 py-5 rounded-2xl text-white font-mono font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-30">{t.start_journey}</button>
                   <button onClick={() => window.open('https://t.me/ComunidadeRQ/27', '_blank')} className="w-full bg-zinc-900 border-2 border-zinc-800 text-zinc-500 rounded-2xl py-4 font-mono font-bold text-[9px] uppercase tracking-widest hover:text-white transition-all">Feedback</button>
+                  <div className="flex justify-center gap-3 pt-2">
+                    <button onClick={() => changeLanguage('PT')} className={`p-3 rounded-xl border-2 transition-all ${currentLang === 'PT' ? 'border-green-600 bg-green-900/20 scale-110 shadow-lg shadow-green-900/20' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-600 hover:bg-zinc-800 text-zinc-600'}`} title="Português">
+                      <Icon.FlagBR />
+                    </button>
+                    <button onClick={() => changeLanguage('EN')} className={`p-3 rounded-xl border-2 transition-all ${currentLang === 'EN' ? 'border-blue-600 bg-blue-900/20 scale-110 shadow-lg shadow-blue-900/20' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-600 hover:bg-zinc-800 text-zinc-600'}`} title="English">
+                      <Icon.FlagUS />
+                    </button>
+                    <button onClick={() => changeLanguage('ES')} className={`p-3 rounded-xl border-2 transition-all ${currentLang === 'ES' ? 'border-yellow-600 bg-yellow-900/20 scale-110 shadow-lg shadow-yellow-900/20' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-600 hover:bg-zinc-800 text-zinc-600'}`} title="Español">
+                      <Icon.FlagES />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -402,6 +434,10 @@ const App: React.FC = () => {
                       <span className="text-lg font-black text-yellow-500">{gameState.lastStats?.attack}</span>
                    </div>
                    <div className="bg-black/40 p-3 rounded-2xl border border-zinc-800/50 flex flex-col items-center">
+                      <span className="text-[8px] font-bold text-zinc-600 uppercase">ESCUDO</span>
+                      <span className="text-lg font-black text-blue-500">{gameState.lastStats?.maxArmor}</span>
+                   </div>
+                   <div className="col-span-2 bg-black/40 p-3 rounded-2xl border border-zinc-800/50 flex flex-col items-center">
                       <span className="text-[8px] font-bold text-zinc-600 uppercase">VELOCIDADE (VEL)</span>
                       <span className="text-lg font-black text-green-500">{gameState.lastStats?.speed}</span>
                    </div>
