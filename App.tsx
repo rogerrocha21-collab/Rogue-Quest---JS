@@ -49,7 +49,7 @@ const App: React.FC = () => {
          let minLen = Infinity;
          let bestPath = null;
          for (const enemy of state.enemies) {
-             const path = findDungeonPath(pos, enemy, state.map, state.enemies); // Pass enemies to avoid blocking check issues if needed, mostly fine
+             const path = findDungeonPath(pos, enemy, state.map, state.enemies); 
              if (path && path.length < minLen) {
                  minLen = path.length;
                  bestPath = path;
@@ -70,10 +70,18 @@ const App: React.FC = () => {
       const saved = localStorage.getItem('rq_save_v150_final');
       if (saved) {
         const data = JSON.parse(saved);
-        setGameState({ ...data, gameStatus: 'START_SCREEN' as const });
-        setNameInput(data.playerName || '');
-        if (data.language) setCurrentLang(data.language);
-        playerPosRef.current = data.playerPos;
+        
+        if (data.gameStatus === 'LOST' || data.gameStatus === 'RELIC_SELECTION') {
+            setGameState(data);
+            setNameInput(data.playerName || '');
+            if (data.language) setCurrentLang(data.language);
+            playerPosRef.current = data.playerPos;
+        } else {
+            setGameState({ ...data, gameStatus: 'START_SCREEN' as const });
+            setNameInput(data.playerName || '');
+            if (data.language) setCurrentLang(data.language);
+            playerPosRef.current = data.playerPos;
+        }
       } else {
         const initialPos = { x: 0, y: 0 };
         setGameState({
@@ -162,20 +170,6 @@ const App: React.FC = () => {
     let invSize = 5;
     let startInventory = inventory || [];
     
-    // Preserve existing compass/map state if re-generating or moving levels, but initLevel is usually called with fresh params or carried over.
-    // If we are calling this from App start, gameState is null, so rely on defaults.
-    // If calling from next level, we rely on state closure but initLevel takes arguments. 
-    // We should ensure compass/map are preserved in the arguments or state update logic.
-    // Actually, initLevel is called with specific params. We need to preserve hasCompass/hasMap from previous state if available.
-    // However, initLevel here resets state. We need to be careful. 
-    // The current implementation of initLevel replaces state. We need to pass hasCompass/hasMap or merge.
-    // Let's modify initLevel to check current state for persistence if not explicitly provided, OR rely on the fact that we will update state with prev values.
-    // BUT initLevel wipes everything. So we must grab values from 'gameState' ref or pass them.
-    // Since initLevel is memoized and used in callbacks, accessing 'gameState' directly inside might be stale if not careful, but 'setGameState' callback is safe.
-    // Better approach: InitLevel is called with explicit params. We should probably modify the call sites to pass these, OR update initLevel to merge.
-    
-    // Let's assume for now we patch initLevel to take these or we just update the setGameState to merge persistent flags.
-    
     setGameState(prev => {
         let finalHasCompass = prev?.hasCompass || false;
         let finalHasMap = prev?.hasMap || false;
@@ -186,11 +180,9 @@ const App: React.FC = () => {
             if (activeRelic?.id === 'mark') { currentGold += 60; currentStats.maxHp = Math.floor(currentStats.maxHp * 0.9); currentStats.hp = currentStats.maxHp; }
             if (activeRelic?.id === 'heart') { currentStats.attack = Math.floor(currentStats.attack * 1.1); currentStats.maxHp = Math.floor(currentStats.maxHp * 0.95); currentStats.hp = Math.min(currentStats.hp, currentStats.maxHp); }
             if (activeRelic?.id === 'life_long') { currentStats.maxHp += 30; currentStats.hp = currentStats.maxHp; }
-            // Reset permanent items on level 1 (New Run)
-            if (!prev || prev.gameStatus === 'WON' || prev.gameStatus === 'LOST' || level === 1) {
-               finalHasCompass = false;
-               finalHasMap = false;
-            }
+            
+            finalHasCompass = false;
+            finalHasMap = false;
         } else {
             if (activeRelic?.id === 'slots') invSize = 10;
         }
@@ -205,13 +197,12 @@ const App: React.FC = () => {
           hasCompass: finalHasCompass, hasMap: finalHasMap
         };
 
-        // Calculate initial guides
         const guides = updateGuides(tempState, tempState.playerPos);
         tempState.compassPath = guides.compass;
         tempState.mapPath = guides.map;
 
         playerPosRef.current = tempState.playerPos;
-        saveGame(tempState);
+        saveGame(tempState); 
         return tempState;
     });
     setMoveQueue([]);
@@ -272,7 +263,6 @@ const App: React.FC = () => {
         let newTrail = prev.tronTrail || [];
         if (prev.tronModeActive) newTrail = [...newTrail, oldPos].slice(-10);
 
-        // Update Guides
         const guides = updateGuides(prev, nextPos);
         
         return { ...prev, playerPos: nextPos, activePet: updatedPet, tronTrail: newTrail, compassPath: guides.compass, mapPath: guides.map } as GameState;
@@ -286,7 +276,11 @@ const App: React.FC = () => {
   const onCombatFinish = (newStats: EntityStats, win: boolean, goldEarned: number, petHp?: number) => {
     setGameState(prev => {
       if (!prev) return prev;
-      if (!win) return { ...prev, gameStatus: 'LOST' as const, lastStats: { ...newStats, hp: 0 } };
+      if (!win) {
+          const lostState = { ...prev, gameStatus: 'LOST' as const, lastStats: { ...newStats, hp: 0 } };
+          saveGame(lostState); 
+          return lostState;
+      }
       
       const updatedPet = prev.activePet ? { ...prev.activePet, hp: petHp || 0 } : undefined;
       let finalGold = goldEarned;
@@ -295,6 +289,10 @@ const App: React.FC = () => {
       if (prev.activeAltarEffect?.id === 'cursed_greed') finalGold = Math.floor(finalGold * 0.5);
 
       let nextStats = { ...newStats };
+      
+      // RESTAURAÇÃO DO ESCUDO APÓS COMBATE
+      nextStats.armor = nextStats.maxArmor;
+
       if (prev.activeRelic?.id === 'vamp') {
         nextStats.hp = Math.min(nextStats.maxHp, nextStats.hp + Math.floor(nextStats.maxHp * 0.15));
       }
@@ -308,7 +306,6 @@ const App: React.FC = () => {
       playCoinSound();
       const newEnemies = prev.enemies.filter(e => e.id !== prev.currentEnemy?.id);
       
-      // Update compass after kill
       const tempState = { ...prev, enemies: newEnemies };
       const guides = updateGuides(tempState, prev.playerPos);
 
@@ -385,7 +382,12 @@ const App: React.FC = () => {
 
   const startRebirth = () => {
     const options = [...RELICS_POOL].sort(() => 0.5 - Math.random()).slice(0, 3);
-    setGameState(prev => prev ? { ...prev, gameStatus: 'RELIC_SELECTION' as const, relicOptions: options } : null);
+    setGameState(prev => {
+        if(!prev) return null;
+        const newState = { ...prev, gameStatus: 'RELIC_SELECTION' as const, relicOptions: options };
+        saveGame(newState); 
+        return newState;
+    });
   };
 
   const handleRelicSelect = (relic: Relic) => {
@@ -482,7 +484,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* TELA DE MORTE REFINADA */}
       {gameState.gameStatus === 'LOST' && (
         <div className="fixed inset-0 z-[120] bg-black/98 flex flex-col items-center justify-center p-6 animate-in fade-in overflow-y-auto backdrop-blur-md">
           <div className="max-w-md w-full text-center space-y-8 animate-in zoom-in-95 duration-500">
@@ -531,7 +532,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Modais de Gameplay */}
       {gameState.gameStatus === 'COMBAT' && gameState.currentEnemy && (
         <CombatModal 
           playerStats={gameState.playerStats} enemy={gameState.currentEnemy} 
@@ -639,7 +639,6 @@ const App: React.FC = () => {
           onBuyCompass={() => {
              setGameState(prev => {
                  if (!prev) return prev;
-                 // Calc guides
                  const tempState = { ...prev, gold: prev.gold - 90, hasCompass: true };
                  const guides = updateGuides(tempState, prev.playerPos);
                  return { ...tempState, compassPath: guides.compass, mapPath: guides.map } as GameState;
