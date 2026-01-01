@@ -14,6 +14,18 @@ export const INITIAL_PLAYER_STATS = {
   speed: 12,
 };
 
+export const POISONOUS_ENEMIES = [
+  'Aranha Cavernosa', 
+  'Escorpião Gigante', 
+  'Verme da Areia', 
+  'Serpente Aquática', 
+  'Bruxa da Floresta', 
+  'Mutante Corrompido',
+  'Lodo Venenoso', // Novo
+  'Aberração Putrefata', // Novo
+  'Sanguessuga Gigante' // Novo
+];
+
 export const RELICS_POOL: Relic[] = [
   { id: 'slots', name: 'Bolsa Expandida', description: '+5 slots no inventário.', icon: 'Backpack' },
   { id: 'bleed', name: 'Dente Serrilhado', description: '+5% de chance permanente de causar sangramento.', icon: 'Droplets' },
@@ -76,6 +88,11 @@ export const BIOME_ENEMIES: Record<LevelTheme, string[]> = {
   OSSUARY: ['Esqueleto Armado', 'Necromante', 'Guardião de Ossos', 'Espírito Funerário', 'Colosso Ósseo'],
   ASTRAL: ['Entidade Etérea', 'Guardião Astral', 'Fragmento de Consciência', 'Eco Vivo', 'Seres Translúcidos'],
   MATRIX: ['Programa Corrompido', 'Agente de Segurança', 'Vírus Consciente', 'Avatar Hostil', 'Entidade Digital'],
+  FURNACE: ['Íncubo de Cinzas', 'Larva Ígnea', 'Guardião da Brasa', 'Súcubo Incandescente', 'Elemental de Fogo Instável', 'Colosso Vulcânico'],
+  SWAMP: ['Lodo Venenoso', 'Sanguessuga Gigante', 'Morcego Doente', 'Xamã do Brejo', 'Crocodilo Mutante', 'Aberração Putrefata'],
+  TEMPLE: ['Estátua Animada', 'Sentinela Antiga', 'Sacerdote Profanado', 'Autômato Rúnico', 'Guardião de Obelisco', 'Avatar do Templo'],
+  CHAOS: ['Entidade Fraturada', 'Eco Distorcido', 'Parasita do Caos', 'Aberração Mutável', 'Vulto Caótico', 'Núcleo Anômalo'],
+  HIVE: ['Larva Rasteira', 'Operária da Colmeia', 'Soldado Quitinoso', 'Aranha Tecelã', 'Rainha Menor', 'Matriz da Colmeia'],
 };
 
 export const THEME_CONFIG: Record<LevelTheme, { nameKey: string, wall: string, floor: string, char: string, wallChar: string }> = {
@@ -92,6 +109,11 @@ export const THEME_CONFIG: Record<LevelTheme, { nameKey: string, wall: string, f
   OSSUARY: { nameKey: 'theme_ossuary', wall: 'text-zinc-200', floor: 'text-zinc-700', char: '☠', wallChar: '✟' },
   ASTRAL: { nameKey: 'theme_astral', wall: 'text-sky-400', floor: 'text-sky-950', char: '✨', wallChar: '✧' },
   MATRIX: { nameKey: 'theme_matrix', wall: 'text-emerald-500', floor: 'text-black', char: '1', wallChar: '0' },
+  FURNACE: { nameKey: 'theme_furnace', wall: 'text-orange-600', floor: 'text-red-950', char: '~', wallChar: '♨' },
+  SWAMP: { nameKey: 'theme_swamp', wall: 'text-emerald-700', floor: 'text-green-950', char: '≈', wallChar: '⍾' },
+  TEMPLE: { nameKey: 'theme_temple', wall: 'text-amber-500', floor: 'text-stone-900', char: '∏', wallChar: '🏛' },
+  CHAOS: { nameKey: 'theme_chaos', wall: 'text-fuchsia-600', floor: 'text-purple-950', char: '?', wallChar: '🌀' },
+  HIVE: { nameKey: 'theme_hive', wall: 'text-yellow-700', floor: 'text-orange-950', char: '⬡', wallChar: '🕸' },
 };
 
 export const TILE_COLORS: Record<string, string> = {
@@ -107,7 +129,9 @@ export const TILE_COLORS: Record<string, string> = {
   MERCHANT: 'text-indigo-400',
   ALTAR: 'text-purple-500',
   TRON: 'text-cyan-400',
-  PET: 'text-orange-400'
+  PET: 'text-orange-400',
+  TRAP: 'text-zinc-500',
+  EGG: 'text-white'
 };
 
 export const ENEMY_TYPES = [
@@ -188,6 +212,11 @@ export const TRANSLATIONS: Record<Language, any> = {
     theme_ossuary: 'Ossuário',
     theme_astral: 'Plano Astral',
     theme_matrix: 'Matrix',
+    theme_furnace: 'Fornalha Abissal',
+    theme_swamp: 'Pântano Tóxico',
+    theme_temple: 'Templo Esquecido',
+    theme_chaos: 'Zona do Caos',
+    theme_hive: 'Colmeia Profunda',
     final_stats: "ESTATÍSTICAS FINAIS",
     blood: "SANGUE",
     key: "CHAVE",
@@ -271,7 +300,21 @@ export const TRANSLATIONS: Record<Language, any> = {
     compass_desc: "Revela e guia até os inimigos.",
     map_name: "Mapa",
     map_desc: "Revela e guia até a saída.",
-    enemy_count: "Inimigos:"
+    enemy_count: "Inimigos:",
+    antidote_name: "Antídoto",
+    antidote_desc: "Cura veneno imediatamente.",
+    poisoned: "ENVENENADO",
+    cured: "CURADO DO VENENO!",
+    poison_damage: "Veneno:",
+    trap_spike: "ARMADILHA DE ESPINHOS!",
+    trap_poison: "ARMADILHA DE VENENO!",
+    trap_alarm: "ALARME! INIMIGO ATRAÍDO!",
+    trap_explosive: "KABOOM! EXPLOSÃO!",
+    trap_evaded: "Armadilha evitada (Velocidade)!",
+    crow_reveal: "O Corvo avistou armadilhas!",
+    paralyzed: "PARALISADO! Perdeu o turno!",
+    egg_story: "O ovo se rompe sem som.\nA casca cai em pedaços negros, como carvão úmido.\nDe dentro, algo observa antes de respirar.\nUm corvo — pequeno, magro, atento demais para ser apenas um animal.\nEle não grasna. Não foge.\nApenas inclina a cabeça… como se já conhecesse você.\nA partir deste momento, o corvo caminha ao seu lado.\nEle não luta por você.\nEle não sangra por você.\nMas ele vê o que você não vê.\nOnde houver armadilhas ocultas, o corvo estará primeiro.\nOnde o chão mente, ele marcará o perigo com luz e presença.\nMesmo que você caia, mesmo que morra,\no corvo lembrará.\nE quando você retornar, ele já estará esperando.",
+    egg_accept: "Aceitar o Destino"
   },
   EN: {
     inventory_title: "INVENTORY",
@@ -328,6 +371,11 @@ export const TRANSLATIONS: Record<Language, any> = {
     theme_ossuary: 'Ossuary',
     theme_astral: 'Astral Plane',
     theme_matrix: 'The Matrix',
+    theme_furnace: 'Abyssal Furnace',
+    theme_swamp: 'Toxic Swamp',
+    theme_temple: 'Forgotten Temple',
+    theme_chaos: 'Chaos Zone',
+    theme_hive: 'Deep Hive',
     final_stats: "FINAL STATS",
     blood: "BLOOD",
     key: "KEY",
@@ -411,7 +459,21 @@ export const TRANSLATIONS: Record<Language, any> = {
     compass_desc: "Reveals and guides to enemies.",
     map_name: "Map",
     map_desc: "Reveals and guides to the exit.",
-    enemy_count: "Enemies:"
+    enemy_count: "Enemies:",
+    antidote_name: "Antidote",
+    antidote_desc: "Cures poison immediately.",
+    poisoned: "POISONED",
+    cured: "POISON CURED!",
+    poison_damage: "Poison:",
+    trap_spike: "SPIKE TRAP!",
+    trap_poison: "POISON TRAP!",
+    trap_alarm: "ALARM! ENEMY ATTRACTED!",
+    trap_explosive: "KABOOM! EXPLOSION!",
+    trap_evaded: "Trap evaded (Speed)!",
+    crow_reveal: "Crow revealed traps!",
+    paralyzed: "PARALYZED! Turn lost!",
+    egg_story: "The egg breaks without a sound.\nThe shell falls in black shards, like wet coal.\nFrom within, something watches before breathing.\nA crow — small, thin, too alert to be just an animal.\nIt does not caw. It does not flee.\nIt just tilts its head… as if it already knew you.\nFrom this moment on, the crow walks by your side.\nIt does not fight for you.\nIt does not bleed for you.\nBut it sees what you do not see.\nWhere there are hidden traps, the crow will be there first.\nWhere the ground lies, it will mark the danger with light and presence.\nEven if you fall, even if you die,\nthe crow will remember.\nAnd when you return, it will be waiting.",
+    egg_accept: "Accept Destiny"
   },
   ES: {
     inventory_title: "INVENTARIO",
@@ -468,6 +530,11 @@ export const TRANSLATIONS: Record<Language, any> = {
     theme_ossuary: 'Osario',
     theme_astral: 'Plano Astral',
     theme_matrix: 'Matrix',
+    theme_furnace: 'Horno Abisal',
+    theme_swamp: 'Pantano Tóxico',
+    theme_temple: 'Templo Olvidado',
+    theme_chaos: 'Zona del Caos',
+    theme_hive: 'Colmena Profunda',
     final_stats: "ESTADÍSTICAS FINALES",
     blood: "SANGRE",
     key: "LLAVE",
@@ -551,6 +618,20 @@ export const TRANSLATIONS: Record<Language, any> = {
     compass_desc: "Revela y guía hacia los enemigos.",
     map_name: "Mapa",
     map_desc: "Revela y guía hacia la salida.",
-    enemy_count: "Enemigos:"
+    enemy_count: "Enemigos:",
+    antidote_name: "Antídoto",
+    antidote_desc: "Cura veneno inmediatamente.",
+    poisoned: "ENVENENADO",
+    cured: "¡VENENO CURADO!",
+    poison_damage: "Veneno:",
+    trap_spike: "¡TRAMPA DE PINCHOS!",
+    trap_poison: "¡TRAMPA DE VENENO!",
+    trap_alarm: "¡ALARMA! ¡ENEMIGO ATRAÍDO!",
+    trap_explosive: "¡KABOOM! ¡EXPLOSIÓN!",
+    trap_evaded: "¡Trampa evitada (Velocidad)!",
+    crow_reveal: "¡El cuervo reveló trampas!",
+    paralyzed: "¡PARALIZADO! ¡Turno perdido!",
+    egg_story: "El huevo se rompe sin sonido.\nLa cáscara cae en pedazos negros, como carbón húmedo.\nDesde dentro, algo observa antes de respirar.\nUn cuervo — pequeño, delgado, demasiado atento para ser solo un animal.\nNo grazna. No huye.\nSolo inclina la cabeza... como si ya te conociera.\nA partir de este momento, el cuervo camina a tu lado.\nNo lucha por ti.\nNo sangra por ti.\nPero ve lo que tú no ves.\nDonde haya trampas ocultas, el cuervo estará primero.\nDonde el suelo miente, marcará el peligro con luz y presencia.\nIncluso si caes, incluso si mueres,\nel cuervo recordará.\nY cuando regreses, él ya estará esperando.",
+    egg_accept: "Aceptar el Destino"
   }
 };

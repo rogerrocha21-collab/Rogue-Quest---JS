@@ -162,5 +162,14 @@ export const Icon = {
   ),
   Map: (props: IconProps) => (
     <svg viewBox="0 0 24 24" width={props.width || "16"} height={props.height || "16"} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+  ),
+  Antidote: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" width={props.width || "18"} height={props.height || "18"} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 14a6 6 0 0 0 12 0"/><path d="M12 14v-6"/><path d="M9.5 8h5"/><path d="M12 2v6"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+  ),
+  Trap: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" width={props.width || "18"} height={props.height || "18"} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="3" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3" fill="currentColor" fillOpacity="0.5"/></svg>
+  ),
+  Egg: (props: IconProps) => (
+    <svg viewBox="0 0 24 24" width={props.width || "18"} height={props.height || "18"} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c4.97 0 9-4.03 9-9 0-4.97-9-13-9-13S3 8.03 3 13c0 4.97 4.03 9 9 9z" /><path d="M9.5 10a2.5 2.5 0 0 1 0 5" opacity="0.5"/></svg>
   )
 };

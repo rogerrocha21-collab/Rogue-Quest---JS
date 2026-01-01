@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { GameState, Position, EntityStats, StatChoice, PotionEntity, Pet, Language, Relic, AltarEffect } from './types';
+import { GameState, Position, EntityStats, StatChoice, PotionEntity, Pet, Language, Relic, AltarEffect, PoisonStatus, Trap } from './types';
 import { INITIAL_PLAYER_STATS, MAP_WIDTH, MAP_HEIGHT, TRANSLATIONS, RELICS_POOL, THEME_CONFIG, MAX_LEVELS, BLESSINGS_POOL, CURSES_POOL } from './constants';
 import { generateDungeon, findDungeonPath } from './utils/dungeon';
 import GameMap from './components/GameMap';
 import HUD from './components/HUD';
-import { CombatModal, ChestModal, MerchantShopModal, TutorialModal, PotionPickupModal, RelicSelectionModal, AltarInteractionModal, AltarResultModal } from './components/Modals';
+import { CombatModal, ChestModal, MerchantShopModal, TutorialModal, PotionPickupModal, RelicSelectionModal, AltarInteractionModal, AltarResultModal, EggStoryModal } from './components/Modals';
 import { Icon } from './components/Icons';
 
 const App: React.FC = () => {
@@ -68,16 +67,19 @@ const App: React.FC = () => {
   useEffect(() => {
     try {
       const saved = localStorage.getItem('rq_save_v150_final');
+      // Carregar status global do corvo
+      const globalUnlock = localStorage.getItem('rq_crow_unlocked') === 'true';
+
       if (saved) {
         const data = JSON.parse(saved);
         
         if (data.gameStatus === 'LOST' || data.gameStatus === 'RELIC_SELECTION') {
-            setGameState(data);
+            setGameState({ ...data, isCrowUnlocked: globalUnlock }); // Garante consistência
             setNameInput(data.playerName || '');
             if (data.language) setCurrentLang(data.language);
             playerPosRef.current = data.playerPos;
         } else {
-            setGameState({ ...data, gameStatus: 'START_SCREEN' as const });
+            setGameState({ ...data, gameStatus: 'START_SCREEN' as const, isCrowUnlocked: globalUnlock });
             setNameInput(data.playerName || '');
             if (data.language) setCurrentLang(data.language);
             playerPosRef.current = data.playerPos;
@@ -87,10 +89,11 @@ const App: React.FC = () => {
         setGameState({
           playerName: '', gold: 0, level: 1, theme: 'VOID' as const, playerPos: initialPos,
           playerStats: { ...INITIAL_PLAYER_STATS }, map: [], enemies: [], chests: [],
-          potions: [], items: [], hasKey: false, enemiesKilledInLevel: 0,
+          potions: [], items: [], traps: [], hasKey: false, enemiesKilledInLevel: 0,
           stairsPos: {x:0,y:0}, gameStatus: 'START_SCREEN' as const, logs: [],
           tronModeActive: false, tronTimeLeft: 0, tronTrail: [], language: 'PT',
-          inventory: [], inventorySize: 5, hasUsedAltarInLevel: false, hasCompass: false, hasMap: false
+          inventory: [], inventorySize: 5, hasUsedAltarInLevel: false, hasCompass: false, hasMap: false,
+          isCrowUnlocked: globalUnlock
         });
         playerPosRef.current = initialPos;
         setIsNewGameMode(true);
@@ -104,6 +107,9 @@ const App: React.FC = () => {
   const saveGame = useCallback((state: GameState) => {
     try {
       localStorage.setItem('rq_save_v150_final', JSON.stringify({ ...state, language: currentLang }));
+      if (state.isCrowUnlocked) {
+          localStorage.setItem('rq_crow_unlocked', 'true');
+      }
     } catch (e) {}
   }, [currentLang]);
 
@@ -143,6 +149,7 @@ const App: React.FC = () => {
     if (attacker === 'player') playSound(600, 'square', 0.15, 0.04);
     else playSound(220, 'sawtooth', 0.2, 0.06);
   };
+  const playTrapSound = () => playSound(150, 'sawtooth', 0.2, 0.1);
 
   const startMusic = () => {
     if (audioContext.current) return;
@@ -164,11 +171,21 @@ const App: React.FC = () => {
       setGameState(prev => prev ? { ...prev, gameStatus: 'WON' as const } : null);
       return;
     }
-    const dungeon = generateDungeon(level);
+    
+    // Check global crow unlock
+    const globalCrow = localStorage.getItem('rq_crow_unlocked') === 'true';
+    
+    const dungeon = generateDungeon(level, globalCrow);
     let currentStats = stats ? { ...stats, armor: stats.maxArmor } : { ...INITIAL_PLAYER_STATS };
     let currentGold = gold ?? 0;
     let invSize = 5;
     let startInventory = inventory || [];
+    
+    let startingPet = activePet;
+    // Se novo jogo e corvo desbloqueado, da o corvo
+    if (level === 1 && globalCrow && !startingPet) {
+        startingPet = { type: 'CORVO', name: 'CORVO', hp: 999, maxHp: 999, pos: { x: 0, y: 0 } };
+    }
     
     setGameState(prev => {
         let finalHasCompass = prev?.hasCompass || false;
@@ -192,14 +209,20 @@ const App: React.FC = () => {
           ...dungeon, playerName: finalPlayerName, gold: currentGold, level, playerStats: currentStats, items: [], hasKey: false, enemiesKilledInLevel: 0,
           gameStatus: (level === 1 && !stats) ? 'TUTORIAL' as const : 'PLAYING' as const,
           logs: (level === 1 && !stats) ? [`${finalPlayerName} entrou no abismo.`] : [`Descendo para o nível ${level}`],
-          inventory: startInventory, inventorySize: invSize, activePet, activeRelic, language: currentLang, hasUsedAltarInLevel: false, tronModeActive: false, tronTimeLeft: 0, tronTrail: [],
+          inventory: startInventory, inventorySize: invSize, 
+          activePet: startingPet, 
+          activeRelic, language: currentLang, hasUsedAltarInLevel: false, tronModeActive: false, tronTimeLeft: 0, tronTrail: [],
           activeAltarEffect: undefined, keyPath: undefined,
-          hasCompass: finalHasCompass, hasMap: finalHasMap
+          hasCompass: finalHasCompass, hasMap: finalHasMap, poisonStatus: undefined,
+          isCrowUnlocked: globalCrow
         };
 
         const guides = updateGuides(tempState, tempState.playerPos);
         tempState.compassPath = guides.compass;
         tempState.mapPath = guides.map;
+
+        // Sync crow pos if exists
+        if (tempState.activePet) tempState.activePet.pos = tempState.playerPos;
 
         playerPosRef.current = tempState.playerPos;
         saveGame(tempState); 
@@ -222,7 +245,22 @@ const App: React.FC = () => {
         if (!prev || prev.gameStatus !== 'PLAYING' || moveQueue.length === 0) return prev;
         const nextPos = moveQueue[0];
         const oldPos = { ...prev.playerPos };
-        const updatedPet = prev.activePet ? { ...prev.activePet, pos: oldPos } : undefined;
+        
+        let updatedPet = prev.activePet ? { ...prev.activePet, pos: oldPos } : undefined;
+        
+        // --- CROW MOVEMENT LOGIC ---
+        // Se o pet for corvo, ele deve priorizar ficar em cima de armadilhas próximas não triggadas
+        if (updatedPet && updatedPet.type === 'CORVO') {
+            const nearbyTrap = prev.traps.find(t => 
+                !t.triggered && 
+                Math.abs(t.x - nextPos.x) < 6 && 
+                Math.abs(t.y - nextPos.y) < 6
+            );
+            if (nearbyTrap) {
+                updatedPet.pos = { x: nearbyTrap.x, y: nearbyTrap.y };
+            }
+        }
+
         const enemy = prev.enemies.find(e => e.x === nextPos.x && e.y === nextPos.y);
         
         if (enemy) { 
@@ -252,6 +290,12 @@ const App: React.FC = () => {
         if (prev.altarPos && nextPos.x === prev.altarPos.x && nextPos.y === prev.altarPos.y) {
           setMoveQueue([]); playerPosRef.current = nextPos; return { ...prev, gameStatus: 'ALTAR_INTERACTION' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
         }
+
+        // Egg Interaction
+        if (prev.eggPos && nextPos.x === prev.eggPos.x && nextPos.y === prev.eggPos.y) {
+            setMoveQueue([]); playerPosRef.current = nextPos;
+            return { ...prev, gameStatus: 'EGG_INTERACTION' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
+        }
         
         if (nextPos.x === prev.stairsPos.x && nextPos.y === prev.stairsPos.y) {
           if (prev.hasKey && prev.enemiesKilledInLevel > 0) { playChime(); setMoveQueue([]); return { ...prev, gameStatus: 'NEXT_LEVEL' as const } as GameState; }
@@ -265,7 +309,123 @@ const App: React.FC = () => {
 
         const guides = updateGuides(prev, nextPos);
         
-        return { ...prev, playerPos: nextPos, activePet: updatedPet, tronTrail: newTrail, compassPath: guides.compass, mapPath: guides.map } as GameState;
+        // --- POISON LOGIC IN MOVEMENT ---
+        let currentPoison = prev.poisonStatus;
+        let currentHp = prev.playerStats.hp;
+        let newLogs = [...prev.logs];
+        
+        if (currentPoison) {
+            const damage = Math.max(1, Math.floor(prev.playerStats.maxHp * (currentPoison.damagePerTurn / 100)));
+            currentHp -= damage;
+            if (currentHp <= 0) {
+               currentHp = 0;
+               setMoveQueue([]);
+               return { ...prev, gameStatus: 'LOST' as const, lastStats: { ...prev.playerStats, hp: 0 }, logs: [...newLogs, `${t.poison_damage} -${damage}`] } as GameState;
+            }
+            
+            const remaining = currentPoison.turnsRemaining - 1;
+            if (remaining <= 0) {
+                currentPoison = undefined;
+                newLogs.push(t.cured);
+            } else {
+                currentPoison = { ...currentPoison, turnsRemaining: remaining };
+            }
+        }
+
+        // --- TRAP LOGIC ---
+        let finalHp = currentHp;
+        let finalPoison = currentPoison;
+        let triggeredTrap: Trap | undefined = undefined;
+        let closestEnemyToTrigger: any = undefined;
+        let nextGameStatus: GameState['gameStatus'] = prev.gameStatus;
+
+        const trap = prev.traps.find(t => t.x === nextPos.x && t.y === nextPos.y && !t.triggered);
+        if (trap) {
+            // Evasion Check
+            if (prev.playerStats.speed > 85) {
+                newLogs.push(t.trap_evaded);
+            } else {
+                playTrapSound();
+                triggeredTrap = { ...trap, triggered: true, revealed: true };
+                
+                if (trap.type === 'SPIKE') {
+                    const dmg = Math.floor(prev.playerStats.maxHp * 0.10);
+                    finalHp -= dmg;
+                    newLogs.push(`${t.trap_spike} -${dmg} HP`);
+                } else if (trap.type === 'POISON') {
+                    const dmg = Math.floor(prev.playerStats.maxHp * 0.05);
+                    finalHp -= dmg;
+                    newLogs.push(`${t.trap_poison} -${dmg} HP`);
+                    if (finalPoison) {
+                        finalPoison = { ...finalPoison, turnsRemaining: finalPoison.turnsRemaining + 5 };
+                    } else {
+                        finalPoison = { type: 'WEAK', turnsRemaining: 5, damagePerTurn: 5 };
+                    }
+                } else if (trap.type === 'EXPLOSIVE') {
+                    const dmg = Math.floor(prev.playerStats.maxHp * 0.15);
+                    finalHp -= dmg;
+                    newLogs.push(`${t.trap_explosive} -${dmg} HP`);
+                } else if (trap.type === 'ALARM') {
+                    newLogs.push(t.trap_alarm);
+                    // Find nearest enemy
+                    let minDist = Infinity;
+                    let nearest = null;
+                    prev.enemies.forEach(e => {
+                        const d = Math.abs(e.x - nextPos.x) + Math.abs(e.y - nextPos.y);
+                        if (d < minDist) { minDist = d; nearest = e; }
+                    });
+                    if (nearest) {
+                        setMoveQueue([]);
+                        closestEnemyToTrigger = nearest;
+                        nextGameStatus = 'COMBAT';
+                    }
+                }
+
+                if (finalHp <= 0) {
+                    finalHp = 0;
+                    setMoveQueue([]);
+                    return { ...prev, gameStatus: 'LOST' as const, lastStats: { ...prev.playerStats, hp: 0 }, logs: newLogs } as GameState;
+                }
+            }
+        }
+
+        // --- CROW PASSIVE (Detect Traps) ---
+        let updatedTraps = prev.traps.map(t => triggeredTrap && t.id === triggeredTrap.id ? triggeredTrap : t);
+        if (updatedPet && updatedPet.type === 'CORVO') {
+            let revealedCount = 0;
+            updatedTraps = updatedTraps.map(t => {
+                // Crow reveals ANY trap in view range (e.g. 5 tiles), not just 3.
+                // The visual is handled by the crow moving to it.
+                // We mark it revealed so it renders on map.
+                if (!t.revealed && !t.triggered) {
+                    const dist = Math.abs(t.x - nextPos.x) + Math.abs(t.y - nextPos.y);
+                    if (dist <= 6) { // Increased range for Crow detection
+                        revealedCount++;
+                        return { ...t, revealed: true };
+                    }
+                }
+                return t;
+            });
+            if (revealedCount > 0 && !prev.logs.includes(t.crow_reveal)) {
+                 // Prevent spamming log every step
+                 newLogs.push(t.crow_reveal);
+            }
+        }
+
+        return { 
+            ...prev, 
+            playerPos: nextPos, 
+            activePet: updatedPet, 
+            tronTrail: newTrail, 
+            compassPath: guides.compass, 
+            mapPath: guides.map,
+            playerStats: { ...prev.playerStats, hp: finalHp },
+            poisonStatus: finalPoison,
+            logs: newLogs,
+            traps: updatedTraps,
+            gameStatus: nextGameStatus,
+            currentEnemy: closestEnemyToTrigger || prev.currentEnemy
+        } as GameState;
       });
     };
     const speed = gameState.tronModeActive ? 40 : 80;
@@ -273,7 +433,7 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, [moveQueue, gameState?.gameStatus, gameState?.tronModeActive, t]);
 
-  const onCombatFinish = (newStats: EntityStats, win: boolean, goldEarned: number, petHp?: number) => {
+  const onCombatFinish = useCallback((newStats: EntityStats, win: boolean, goldEarned: number, petHp?: number, isPoisoned?: boolean) => {
     setGameState(prev => {
       if (!prev) return prev;
       if (!win) {
@@ -290,7 +450,6 @@ const App: React.FC = () => {
 
       let nextStats = { ...newStats };
       
-      // RESTAURAÇÃO DO ESCUDO APÓS COMBATE
       nextStats.armor = nextStats.maxArmor;
 
       if (prev.activeRelic?.id === 'vamp') {
@@ -303,6 +462,21 @@ const App: React.FC = () => {
         nextStats.hp = Math.max(1, nextStats.hp - 5);
       }
 
+      // Poison Application Logic
+      let newPoison = prev.poisonStatus;
+      if (isPoisoned) {
+          const isStrong = Math.random() > 0.7;
+          const type = isStrong ? 'STRONG' : 'WEAK';
+          const turns = isStrong ? 7 : 15;
+          const dmg = isStrong ? 7 : 3;
+
+          if (newPoison) {
+              newPoison = { ...newPoison, turnsRemaining: newPoison.turnsRemaining + turns };
+          } else {
+              newPoison = { type: type as any, turnsRemaining: turns, damagePerTurn: dmg };
+          }
+      }
+
       playCoinSound();
       const newEnemies = prev.enemies.filter(e => e.id !== prev.currentEnemy?.id);
       
@@ -313,13 +487,14 @@ const App: React.FC = () => {
         ...prev, playerStats: nextStats, gold: prev.gold + finalGold, gameStatus: 'PLAYING' as const,
         enemies: newEnemies,
         enemiesKilledInLevel: prev.enemiesKilledInLevel + 1, activePet: updatedPet, currentEnemy: undefined, keyPath: undefined,
-        compassPath: guides.compass, mapPath: guides.map
+        compassPath: guides.compass, mapPath: guides.map,
+        poisonStatus: newPoison
       };
       saveGame(updated);
       return updated;
     });
     setMoveQueue([]);
-  };
+  }, [saveGame]); // Added saveGame to dependency array
 
   const usePotionFromInventory = (idx: number) => {
     let used = false;
@@ -472,11 +647,13 @@ const App: React.FC = () => {
           {gameState.gameStatus !== 'WON' && gameState.gameStatus !== 'NEXT_LEVEL' && gameState.gameStatus !== 'RELIC_SELECTION' && gameState.map.length > 0 && (
             <div className="flex flex-col gap-4">
               <GameMap 
-                map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} keyPath={gameState.keyPath} onTileClick={handleTileClick} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} 
+                map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} eggPos={gameState.eggPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} keyPath={gameState.keyPath} onTileClick={handleTileClick} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} 
                 ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'}
                 compassPath={gameState.compassPath} mapPath={gameState.mapPath}
+                poisonStatus={gameState.poisonStatus}
+                traps={gameState.traps}
               />
-              <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}
+              <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} poisonStatus={gameState.poisonStatus} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}
                 hasCompass={gameState.hasCompass} hasMap={gameState.hasMap} enemiesCount={gameState.enemies.length}
               />
             </div>
@@ -530,6 +707,27 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modais de Gameplay */}
+      {gameState.gameStatus === 'EGG_INTERACTION' && (
+        <EggStoryModal 
+          language={currentLang} 
+          onAccept={() => {
+             // Unlock Crow permanently
+             localStorage.setItem('rq_crow_unlocked', 'true');
+             setGameState(prev => {
+                 if (!prev) return null;
+                 return {
+                     ...prev,
+                     isCrowUnlocked: true,
+                     eggPos: undefined, // Remove egg from map
+                     activePet: { type: 'CORVO', name: 'CORVO', hp: 999, maxHp: 999, pos: prev.playerPos }, // Add Crow Pet
+                     gameStatus: 'PLAYING'
+                 };
+             });
+          }}
+        />
       )}
 
       {gameState.gameStatus === 'COMBAT' && gameState.currentEnemy && (
@@ -650,6 +848,17 @@ const App: React.FC = () => {
                  const tempState = { ...prev, gold: prev.gold - 90, hasMap: true };
                  const guides = updateGuides(tempState, prev.playerPos);
                  return { ...tempState, compassPath: guides.compass, mapPath: guides.map } as GameState;
+             });
+          }}
+          onBuyAntidote={() => {
+             setGameState(prev => {
+                 if (!prev) return prev;
+                 return { 
+                     ...prev, 
+                     gold: prev.gold - 50, 
+                     poisonStatus: undefined, 
+                     logs: [...prev.logs, t.cured] 
+                 } as GameState;
              });
           }}
           onBuyPet={(type) => {

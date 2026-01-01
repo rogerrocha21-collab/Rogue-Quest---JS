@@ -1,10 +1,11 @@
 
 import { MAP_WIDTH, MAP_HEIGHT, MAX_LEVELS, BIOME_ENEMIES } from '../constants';
-import { TileType, Enemy, Chest, EntityStats, PotionEntity, LevelTheme, Position } from '../types';
+import { TileType, Enemy, Chest, EntityStats, PotionEntity, LevelTheme, Position, Trap, TrapType } from '../types';
 
 const BIOMES: LevelTheme[] = [
   'CAVE', 'FOREST', 'SNOW', 'DESERT', 'RUINS', 'CATACOMBS', 
-  'OSSUARY', 'MECHANICAL', 'CORRUPTED', 'INFERNO', 'ASTRAL', 'MATRIX', 'VOID'
+  'OSSUARY', 'MECHANICAL', 'CORRUPTED', 'INFERNO', 'ASTRAL', 'MATRIX', 'VOID',
+  'FURNACE', 'SWAMP', 'TEMPLE', 'CHAOS', 'HIVE'
 ];
 
 /**
@@ -36,10 +37,10 @@ function checkPath(start: Position, end: Position, map: TileType[][]): boolean {
   return false;
 }
 
-export function generateDungeon(level: number) {
+export function generateDungeon(level: number, isCrowUnlocked: boolean = false) {
   let attempt = 0;
   while (attempt < 20) {
-    const dungeon = generateRawDungeon(level);
+    const dungeon = generateRawDungeon(level, isCrowUnlocked);
     // Regra Absoluta: Validar caminho Jogador -> Chave e Chave -> Escada
     if (checkPath(dungeon.playerPos, dungeon.keyPos, dungeon.map) && 
         checkPath(dungeon.keyPos, dungeon.stairsPos, dungeon.map)) {
@@ -48,10 +49,10 @@ export function generateDungeon(level: number) {
     attempt++;
   }
   // Fallback seguro: gera um layout aberto garantido se falhar muitas vezes
-  return generateRawDungeon(level, true);
+  return generateRawDungeon(level, isCrowUnlocked, true);
 }
 
-function generateRawDungeon(level: number, forceOpen = false) {
+function generateRawDungeon(level: number, isCrowUnlocked: boolean, forceOpen = false) {
   const currentWidth = Math.min(30 + Math.floor(level / 2), 80);
   const currentHeight = Math.min(25 + Math.floor(level / 3), 55);
   const map: TileType[][] = Array(MAP_HEIGHT).fill(0).map(() => Array(MAP_WIDTH).fill('WALL'));
@@ -101,7 +102,7 @@ function generateRawDungeon(level: number, forceOpen = false) {
 
   // Biomas extremos mais comuns em níveis altos (Abismo, Zona Infernal, Matrix, Plano Astral)
   let theme: LevelTheme;
-  const extremes: LevelTheme[] = ['VOID', 'INFERNO', 'MATRIX', 'ASTRAL'];
+  const extremes: LevelTheme[] = ['VOID', 'INFERNO', 'MATRIX', 'ASTRAL', 'CHAOS', 'FURNACE'];
   if (level > 80 && Math.random() > 0.4) {
     theme = extremes[Math.floor(Math.random() * extremes.length)];
   } else {
@@ -158,7 +159,38 @@ function generateRawDungeon(level: number, forceOpen = false) {
   const altarPos = getFreeTile();
   let merchantPos = (Math.random() > 0.8 || level === 1) ? getFreeTile() : undefined;
 
-  return { map, theme, playerPos, stairsPos, enemies, chests, potions, keyPos, merchantPos, altarPos };
+  // GERAÇÃO DE ARMADILHAS (Nível 30+)
+  const traps: Trap[] = [];
+  if (level >= 30) {
+      let trapCount = Math.floor(level / 8); // Aumenta com o nível
+      
+      // Biomas perigosos tem mais armadilhas
+      if (['INFERNO', 'VOID', 'MATRIX', 'CORRUPTED', 'MECHANICAL', 'FURNACE', 'CHAOS', 'HIVE'].includes(theme)) {
+          trapCount += 3;
+      }
+
+      for(let i=0; i<trapCount; i++) {
+          const pos = getFreeTile();
+          const types: TrapType[] = ['SPIKE', 'POISON', 'ALARM', 'EXPLOSIVE'];
+          const type = types[Math.floor(Math.random() * types.length)];
+          traps.push({
+              id: `t-${level}-${i}`,
+              x: pos.x,
+              y: pos.y,
+              type,
+              triggered: false,
+              revealed: false
+          });
+      }
+  }
+
+  // GERAÇÃO DO OVO (Nível 30, se corvo não desbloqueado)
+  let eggPos: Position | undefined = undefined;
+  if (level === 30 && !isCrowUnlocked) {
+      eggPos = getFreeTile();
+  }
+
+  return { map, theme, playerPos, stairsPos, enemies, chests, potions, keyPos, merchantPos, altarPos, traps, eggPos };
 }
 
 function generateRoomLayout(map: TileType[][], w: number, h: number, count: number, minS: number, maxS: number) {

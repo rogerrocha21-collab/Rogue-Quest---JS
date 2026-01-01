@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { EntityStats, Pet, Language, PotionEntity, Relic, AltarEffect } from '../types';
+import { EntityStats, Pet, Language, PotionEntity, Relic, AltarEffect, PoisonStatus } from '../types';
 import { Icon } from './Icons';
 import { TRANSLATIONS } from '../constants';
 
@@ -18,6 +18,7 @@ interface HUDProps {
   inventorySize: number;
   activeRelic?: Relic;
   activeAltarEffect?: AltarEffect;
+  poisonStatus?: PoisonStatus;
   onUsePotion: (idx: number) => void;
   tronModeActive?: boolean;
   tronTimeLeft?: number;
@@ -28,7 +29,7 @@ interface HUDProps {
 
 const HUD: React.FC<HUDProps> = ({ 
   level, stats, logs, hasKey, kills, gold, playerName, activePet, language = 'PT', 
-  inventory, inventorySize, activeRelic, activeAltarEffect, onUsePotion, 
+  inventory, inventorySize, activeRelic, activeAltarEffect, poisonStatus, onUsePotion, 
   tronModeActive, tronTimeLeft, hasCompass, hasMap, enemiesCount 
 }) => {
   const [showLogs, setShowLogs] = useState(false);
@@ -105,9 +106,15 @@ const HUD: React.FC<HUDProps> = ({
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
               {activeRelic && <button onClick={() => setRelicTooltip(true)} className="text-purple-400 animate-pulse">{React.createElement((Icon as any)[activeRelic.icon], { width: 14, height: 14 })}</button>}
               {activeAltarEffect && <button onClick={() => setEffectTooltip(true)} className={`transition-transform hover:scale-110 ${activeAltarEffect.type === 'BLESSING' ? 'text-yellow-500' : 'text-purple-600'}`}><Icon.Altar width={14} height={14} /></button>}
+              {poisonStatus && (
+                <div className="flex items-center gap-1 bg-green-950/40 border border-green-500/30 px-1.5 py-0.5 rounded text-green-400 animate-pulse">
+                  <Icon.Droplets width={12} height={12} />
+                  <span className="text-[8px] font-bold">{poisonStatus.turnsRemaining}</span>
+                </div>
+              )}
               {hasCompass && <div className="text-cyan-400 animate-pulse flex items-center gap-1"><Icon.Compass width={14} height={14} /><span className="text-[8px] font-bold">{enemiesCount}</span></div>}
               {hasMap && <div className="text-emerald-500 animate-pulse"><Icon.Map width={14} height={14} /></div>}
-              {!activeRelic && !activeAltarEffect && !hasCompass && !hasMap && <span className="text-[7px] text-zinc-700 font-bold uppercase">NENHUM EFEITO</span>}
+              {!activeRelic && !activeAltarEffect && !hasCompass && !hasMap && !poisonStatus && <span className="text-[7px] text-zinc-700 font-bold uppercase">NENHUM EFEITO</span>}
             </div>
           </div>
           <button onClick={() => setShowLogs(!showLogs)} className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[9px] font-bold text-zinc-300 transition-colors uppercase">{showLogs ? t.hide_diary : t.view_diary}</button>

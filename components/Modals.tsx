@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Enemy, EntityStats, StatChoice, PotionEntity, ItemEntity, Pet, Language, Relic, AltarEffect } from '../types';
 import { Icon } from './Icons';
-import { ITEM_POOL, TRANSLATIONS, RELICS_POOL } from '../constants';
+import { ITEM_POOL, TRANSLATIONS, RELICS_POOL, POISONOUS_ENEMIES } from '../constants';
 
 interface CombatLogEntry {
   msg: string;
@@ -19,7 +19,7 @@ interface CombatModalProps {
   inventory?: PotionEntity[];
   onAttackSound?: (attacker: 'player' | 'enemy') => void;
   onUsePotion: (idx: number) => boolean;
-  onFinish: (newPlayerStats: EntityStats, win: boolean, goldEarned: number, petHp?: number) => void;
+  onFinish: (newPlayerStats: EntityStats, win: boolean, goldEarned: number, petHp?: number, isPoisoned?: boolean) => void;
 }
 
 export const CombatModal: React.FC<CombatModalProps> = ({ 
@@ -32,6 +32,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
   const [isHealAnim, setIsHealAnim] = useState(false);
   const [isTakingDamage, setIsTakingDamage] = useState<'player' | 'enemy' | 'pet' | null>(null);
   const [combatLogs, setCombatLogs] = useState<CombatLogEntry[]>([]);
+  const [isPoisonedInCombat, setIsPoisonedInCombat] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pRef = useRef({ ...playerStats }); 
   const t = TRANSLATIONS[language];
@@ -50,9 +51,22 @@ export const CombatModal: React.FC<CombatModalProps> = ({
     let turnCount = 0;
     let lastPlayerAttackTurn = -1;
     let isFirstPlayerHitInCombat = true;
+    let poisoned = false;
+    let playerParalyzed = false;
     
     const resolveTurn = () => {
-      if (pRef.current.hp <= 0 || e.hp <= 0) { setIsDone(true); return; }
+      if (pRef.current.hp <= 0 || e.hp <= 0) { 
+          // Check death effects
+          if (e.hp <= 0 && enemy.type === 'Larva Ígnea') {
+              const explosionDmg = Math.floor(pRef.current.maxHp * 0.15);
+              pRef.current.hp = Math.max(0, pRef.current.hp - explosionDmg);
+              addLog(`Larva explodiu! -${explosionDmg} HP`, 'enemy');
+              setCurrentPStats({ ...pRef.current });
+          }
+          setIsDone(true); 
+          return; 
+      }
+
       const executeSequence = async () => {
         turnCount++;
         const enemyHasInitiative = altarEffect?.id === 'slow_reflexes';
@@ -74,6 +88,14 @@ export const CombatModal: React.FC<CombatModalProps> = ({
 
         const processSide = async (side: 'player' | 'enemy') => {
             if (pRef.current.hp <= 0 || e.hp <= 0) return;
+            
+            // Lógica de Paralisia (Aranha Tecelã)
+            if (side === 'player' && playerParalyzed) {
+                addLog(t.paralyzed, 'enemy');
+                playerParalyzed = false; // Consome a paralisia
+                return;
+            }
+
             if (side === 'player' && altarEffect?.id === 'short_breath' && lastPlayerAttackTurn === turnCount - 1) {
                 addLog(`Você recupera o fôlego...`, 'info');
                 return;
@@ -120,9 +142,40 @@ export const CombatModal: React.FC<CombatModalProps> = ({
 
             if (currentAtkForCalculation > 0) defender.hp -= currentAtkForCalculation;
             if (defender.hp < 0) defender.hp = 0;
-            if (side === 'enemy' && altarEffect?.id === 'mark_of_prey') {
-                pRef.current.hp = Math.max(1, pRef.current.hp - 2);
-                addLog(`Você está sangrando! (-2 HP)`, 'enemy');
+            
+            // Special Enemy Effects
+            if (side === 'enemy') {
+                // Súcubo Incandescente (Life Drain)
+                if (enemy.type === 'Súcubo Incandescente' && currentAtkForCalculation > 0) {
+                    const heal = Math.floor(currentAtkForCalculation * 0.05); // 5% drain
+                    e.hp = Math.min(e.maxHp, e.hp + heal);
+                    addLog(`Súcubo drenou ${heal} HP!`, 'enemy');
+                }
+
+                // Aranha Tecelã (Paralysis)
+                if (enemy.type === 'Aranha Tecelã' && Math.random() < 0.25) { // 25% chance
+                    playerParalyzed = true;
+                }
+
+                // Poison
+                if (POISONOUS_ENEMIES.includes(enemy.type) && !poisoned) {
+                    if (enemy.type === 'Aberração Putrefata') {
+                        // Strong Poison guaranteed
+                        poisoned = true;
+                        setIsPoisonedInCombat(true);
+                        addLog(t.poisoned + " (FORTE)!", 'enemy');
+                    } else if (Math.random() < 0.3) {
+                        // Standard Poison chance
+                        poisoned = true;
+                        setIsPoisonedInCombat(true);
+                        addLog(t.poisoned + "!", 'enemy');
+                    }
+                }
+
+                if (altarEffect?.id === 'mark_of_prey') {
+                    pRef.current.hp = Math.max(1, pRef.current.hp - 2);
+                    addLog(`Você está sangrando! (-2 HP)`, 'enemy');
+                }
             }
 
             if (side === 'player') lastPlayerAttackTurn = turnCount;
@@ -174,12 +227,13 @@ export const CombatModal: React.FC<CombatModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/98 flex items-center justify-center z-50 p-4 backdrop-blur-xl">
-      <div className="bg-[#0a0a0a] border border-[#222] max-w-lg w-full p-6 rounded-[2.5rem] shadow-2xl flex flex-col gap-6">
+      <div className={`bg-[#0a0a0a] border max-w-lg w-full p-6 rounded-[2.5rem] shadow-2xl flex flex-col gap-6 ${isPoisonedInCombat ? 'border-green-900 shadow-[0_0_30px_rgba(34,197,94,0.1)]' : 'border-[#222]'}`}>
         <div className="flex gap-4 items-stretch">
           <div className={`flex-1 flex flex-col items-center gap-4 p-5 rounded-[1.5rem] bg-[#111] border border-[#333] transition-all relative overflow-hidden ${isTakingDamage === 'player' ? 'animate-shake border-red-900' : ''} ${isHealAnim ? 'ring-4 ring-green-500/50 scale-105' : ''}`}>
              {isHealAnim && <div className="absolute inset-0 bg-green-500/10 animate-pulse pointer-events-none" />}
+             {isPoisonedInCombat && <div className="absolute inset-0 bg-green-900/10 pointer-events-none animate-pulse" />}
              <div className="flex items-center justify-center gap-4">
-                <span className={`text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.4)] ${isHealAnim ? 'text-green-400' : ''}`}><Icon.Player width={40} height={40} /></span>
+                <span className={`text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.4)] ${isHealAnim ? 'text-green-400' : ''} ${isPoisonedInCombat ? 'text-green-500' : ''}`}><Icon.Player width={40} height={40} /></span>
                 {activePet && petHp > 0 && (
                    <div className="flex flex-col items-center border-l border-[#333] pl-4">
                       <span className="text-orange-400 animate-pet-wiggle">
@@ -222,7 +276,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
           </div>
         )}
         {isDone && (
-          <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 21) + 10, petHp)} className={`w-full font-black py-5 rounded-2xl uppercase text-[12px] tracking-[0.2em] transition-all ${currentPStats.hp > 0 ? "bg-green-600 text-white hover:bg-green-500" : "bg-red-800 text-white hover:bg-red-700"}`}>
+          <button onClick={() => onFinish(currentPStats, currentPStats.hp > 0, Math.floor(Math.random() * 21) + 10, petHp, isPoisonedInCombat)} className={`w-full font-black py-5 rounded-2xl uppercase text-[12px] tracking-[0.2em] transition-all ${currentPStats.hp > 0 ? "bg-green-600 text-white hover:bg-green-500" : "bg-red-800 text-white hover:bg-red-700"}`}>
             {currentPStats.hp > 0 ? t.collect_reward : t.succumb}
           </button>
         )}
@@ -235,10 +289,11 @@ export const MerchantShopModal: React.FC<{
   gold: number, level: number, hasPet: boolean, language: Language, activeAltarEffect?: AltarEffect, 
   onBuyItem: (item: ItemEntity) => void, onBuyPotion: (pot: PotionEntity, choice: 'use' | 'store') => void, 
   onRentTron: () => void, onBuyPet: (type: Pet['type']) => void, onClose: () => void,
-  hasCompass?: boolean, hasMap?: boolean, onBuyCompass?: () => void, onBuyMap?: () => void
+  hasCompass?: boolean, hasMap?: boolean, onBuyCompass?: () => void, onBuyMap?: () => void,
+  onBuyAntidote: () => void
 }> = ({
   gold, level, hasPet, language, activeAltarEffect, onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose,
-  hasCompass, hasMap, onBuyCompass, onBuyMap
+  hasCompass, hasMap, onBuyCompass, onBuyMap, onBuyAntidote
 }) => {
   const t = TRANSLATIONS[language];
   const discount = activeAltarEffect?.id === 'merchant_blessing' ? 0.8 : 1.0;
@@ -291,6 +346,17 @@ export const MerchantShopModal: React.FC<{
                     <p className="text-[8px] text-emerald-600 font-bold uppercase">{t.map_desc}</p>
                 </div>
                 {!hasMap ? <span className="text-[11px] text-yellow-500 font-black">90 G</span> : <span className="text-[8px] text-green-500 font-bold">OK</span>}
+             </button>
+          </div>
+
+          <div className="w-full p-4 bg-green-950/10 border border-green-500/20 rounded-2xl flex items-center gap-4 hover:bg-green-900/10 transition-all">
+             <div className="text-green-500"><Icon.Antidote width={24} height={24}/></div>
+             <div className="flex-1 text-left">
+               <p className="text-[10px] font-black text-white uppercase">{t.antidote_name}</p>
+               <p className="text-[8px] text-green-600 font-bold uppercase">{t.antidote_desc}</p>
+             </div>
+             <button onClick={onBuyAntidote} disabled={gold < 50} className="px-4 py-2 bg-green-700 hover:bg-green-600 text-white font-black text-[10px] rounded-xl uppercase disabled:opacity-30">
+               50 G
              </button>
           </div>
 
@@ -444,6 +510,21 @@ export const PotionPickupModal: React.FC<{ potion: PotionEntity, onChoice: (mode
            <button onClick={() => onChoice('use')} className="w-full py-4 bg-pink-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-[0.2em] active:scale-95 shadow-lg shadow-pink-900/20">{t.use}</button>
            <button onClick={() => onChoice('store')} className="w-full py-4 bg-[#1a1a1a] text-zinc-400 font-black rounded-2xl uppercase text-[10px] tracking-[0.2em] border border-[#333] active:scale-95">{t.store}</button>
          </div>
+      </div>
+    </div>
+  );
+};
+
+export const EggStoryModal: React.FC<{ onAccept: () => void, language: Language }> = ({ onAccept, language }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <div className="fixed inset-0 bg-black/98 flex items-center justify-center z-[150] p-6 backdrop-blur-3xl">
+      <div className="max-w-md w-full bg-[#050505] border border-zinc-800 p-8 rounded-[3rem] text-center space-y-8 animate-in zoom-in-95 shadow-[0_0_50px_rgba(255,255,255,0.1)]">
+         <div className="flex justify-center scale-[3] text-white animate-pulse"><Icon.Egg /></div>
+         <div className="h-64 overflow-y-auto no-scrollbar border-y border-zinc-900 py-4">
+            <p className="text-zinc-400 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">{t.egg_story}</p>
+         </div>
+         <button onClick={onAccept} className="w-full py-5 bg-white text-black font-black rounded-2xl uppercase text-[11px] tracking-[0.2em] active:scale-95 transition-all">{t.egg_accept}</button>
       </div>
     </div>
   );

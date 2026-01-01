@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { TileType, Position, Enemy, Chest, PotionEntity, ItemEntity, LevelTheme, Pet } from '../types';
+import { TileType, Position, Enemy, Chest, PotionEntity, ItemEntity, LevelTheme, Pet, PoisonStatus, Trap } from '../types';
 import { TILE_COLORS, MAP_WIDTH, MAP_HEIGHT, THEME_CONFIG } from '../constants';
 import { Icon } from './Icons';
 
@@ -12,9 +12,11 @@ interface GameMapProps {
   chests: Chest[];
   potions: PotionEntity[];
   items: ItemEntity[];
+  traps?: Trap[];
   keyPos?: Position;
   merchantPos?: Position;
   altarPos?: Position;
+  eggPos?: Position;
   hasKey: boolean;
   stairsPos: Position;
   tronModeActive?: boolean;
@@ -24,6 +26,7 @@ interface GameMapProps {
   keyPath?: Position[];
   compassPath?: Position[];
   mapPath?: Position[];
+  poisonStatus?: PoisonStatus;
   onTileClick: (x: number, y: number) => void;
 }
 
@@ -31,10 +34,10 @@ const VIEW_W = 11;
 const VIEW_H = 13;
 
 const GameMap: React.FC<GameMapProps> = ({ 
-  map, theme, playerPos, enemies, chests, potions, items, 
-  keyPos, merchantPos, altarPos, hasKey, stairsPos, 
+  map, theme, playerPos, enemies, chests, potions, items, traps = [],
+  keyPos, merchantPos, altarPos, eggPos, hasKey, stairsPos, 
   tronModeActive, tronTrail = [], activePet, 
-  ritualDarkness, keyPath = [], compassPath = [], mapPath = [], onTileClick 
+  ritualDarkness, keyPath = [], compassPath = [], mapPath = [], poisonStatus, onTileClick 
 }) => {
   const config = THEME_CONFIG[theme] || THEME_CONFIG.VOID;
 
@@ -50,18 +53,24 @@ const GameMap: React.FC<GameMapProps> = ({
     if (!map[y] || map[y][x] === undefined) return null;
 
     const isPlayer = x === playerPos.x && y === playerPos.y;
-    const isPet = activePet && x === activePet.pos.x && y === activePet.pos.y && !isPlayer;
+    // Lógica visual do Pet: Se for Corvo, ele já "voa" para a armadilha na lógica do App.tsx, então só renderizamos onde activePet.pos está.
+    const isPet = activePet && x === activePet.pos.x && y === activePet.pos.y && (!isPlayer || activePet.type === 'CORVO');
+    
     const enemy = enemies.find(e => e.x === x && e.y === y);
     const chest = chests.find(c => c.x === x && c.y === y);
     const potion = potions.find(p => p.x === x && p.y === y);
     const isKey = keyPos && x === keyPos.x && y === keyPos.y && !hasKey;
     const isMerchant = merchantPos && x === merchantPos.x && y === merchantPos.y;
     const isAltar = altarPos && x === altarPos.x && y === altarPos.y;
+    const isEgg = eggPos && x === eggPos.x && y === eggPos.y;
     const isStairs = x === stairsPos.x && y === stairsPos.y;
     const isTrail = tronModeActive && tronTrail.some(tp => tp.x === x && tp.y === y);
     const isKeyPath = !hasKey && keyPath.some(kp => kp.x === x && kp.y === y);
     const isCompassPath = compassPath.some(cp => cp.x === x && cp.y === y);
     const isMapPath = mapPath.some(mp => mp.x === x && mp.y === y);
+    
+    const trap = traps.find(t => t.x === x && t.y === y);
+    const isTrapVisible = trap && (trap.revealed || trap.triggered);
 
     // Lógica da Maldição Escuridão Ritual
     let fogOpacity = "opacity-100";
@@ -71,6 +80,10 @@ const GameMap: React.FC<GameMapProps> = ({
         else if (dist > 1) fogOpacity = "opacity-20";
     }
 
+    let playerColorClass = TILE_COLORS.PLAYER;
+    if (tronModeActive) playerColorClass = 'text-cyan-400 animate-tron-pulse scale-150';
+    else if (poisonStatus) playerColorClass = 'text-green-500 animate-pulse';
+
     return (
       <div 
         key={`${x}-${y}`} 
@@ -78,11 +91,11 @@ const GameMap: React.FC<GameMapProps> = ({
         className={`w-8 h-8 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center relative border-[0.5px] border-zinc-900/10 cursor-pointer active:bg-zinc-700/30 transition-all duration-300 ${fogOpacity} ${map[y][x] === 'WALL' ? 'bg-zinc-900/20' : 'bg-transparent'}`}
       >
         {isPlayer ? (
-          <span className={`${tronModeActive ? 'text-cyan-400 animate-tron-pulse scale-150' : TILE_COLORS.PLAYER} drop-shadow-[0_0_15px_rgba(250,204,21,1)] animate-player-bounce z-20`}>
+          <span className={`${playerColorClass} drop-shadow-[0_0_15px_rgba(250,204,21,1)] animate-player-bounce z-20`}>
             {tronModeActive ? <Icon.Horse /> : <Icon.Player />}
           </span>
         ) : isPet ? (
-          <span className={`${TILE_COLORS.PET} animate-pet-wiggle z-10 scale-90`}>
+          <span className={`${TILE_COLORS.PET} animate-pet-wiggle z-30 scale-90 ${activePet.type === 'CORVO' ? 'text-zinc-400 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : ''}`}>
             {activePet.type === 'LOBO' ? <Icon.Wolf /> : activePet.type === 'PUMA' ? <Icon.Puma /> : <Icon.Corvo />}
           </span>
         ) : enemy ? (
@@ -97,8 +110,12 @@ const GameMap: React.FC<GameMapProps> = ({
           <span className={`${TILE_COLORS.POTION} animate-potion-sparkle z-10`}><Icon.Potion /></span>
         ) : chest ? (
           <span className={`${TILE_COLORS.CHEST} drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] z-10`}><Icon.Chest /></span>
+        ) : isEgg ? (
+          <span className={`${TILE_COLORS.EGG} animate-pulse drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] z-10`}><Icon.Egg /></span>
         ) : isStairs ? (
           <span className={`${TILE_COLORS.STAIRS} animate-pulse scale-110 z-10`}><Icon.Stairs /></span>
+        ) : isTrapVisible ? (
+          <span className={`${TILE_COLORS.TRAP} animate-pulse z-0`}><Icon.Trap /></span>
         ) : isKeyPath ? (
            <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_yellow] z-0" />
         ) : isCompassPath ? (

@@ -1,7 +1,7 @@
 
-export type TileType = 'WALL' | 'FLOOR' | 'PLAYER' | 'ENEMY' | 'CHEST' | 'STAIRS' | 'POTION' | 'ITEM' | 'KEY' | 'MERCHANT' | 'EMPTY' | 'ALTAR';
+export type TileType = 'WALL' | 'FLOOR' | 'PLAYER' | 'ENEMY' | 'CHEST' | 'STAIRS' | 'POTION' | 'ITEM' | 'KEY' | 'MERCHANT' | 'EMPTY' | 'ALTAR' | 'EGG';
 
-export type LevelTheme = 'FOREST' | 'DESERT' | 'SNOW' | 'CAVE' | 'MATRIX' | 'INFERNO' | 'VOID' | 'RUINS' | 'MECHANICAL' | 'CORRUPTED' | 'CATACOMBS' | 'OSSUARY' | 'ASTRAL';
+export type LevelTheme = 'FOREST' | 'DESERT' | 'SNOW' | 'CAVE' | 'MATRIX' | 'INFERNO' | 'VOID' | 'RUINS' | 'MECHANICAL' | 'CORRUPTED' | 'CATACOMBS' | 'OSSUARY' | 'ASTRAL' | 'FURNACE' | 'SWAMP' | 'TEMPLE' | 'CHAOS' | 'HIVE';
 
 export type Language = 'PT' | 'EN' | 'ES';
 
@@ -67,6 +67,21 @@ export interface AltarEffect {
   descKey: string;
 }
 
+export interface PoisonStatus {
+  damagePerTurn: number; // Porcentagem ou valor fixo
+  turnsRemaining: number;
+  type: 'WEAK' | 'STRONG';
+}
+
+export type TrapType = 'SPIKE' | 'POISON' | 'ALARM' | 'EXPLOSIVE';
+
+export interface Trap extends Position {
+  id: string;
+  type: TrapType;
+  triggered: boolean;
+  revealed: boolean;
+}
+
 export interface GameState {
   playerName: string;
   gold: number;
@@ -79,13 +94,16 @@ export interface GameState {
   chests: Chest[];
   potions: PotionEntity[];
   items: ItemEntity[];
+  traps: Trap[];
   merchantPos?: Position;
   altarPos?: Position;
   keyPos?: Position;
+  eggPos?: Position; // Posição do Ovo Misterioso
+  isCrowUnlocked: boolean; // Persistência do Corvo
   hasKey: boolean;
   enemiesKilledInLevel: number;
   stairsPos: Position;
-  gameStatus: 'START_SCREEN' | 'TUTORIAL' | 'PLAYING' | 'COMBAT' | 'CHEST_OPEN' | 'MERCHANT_SHOP' | 'WON' | 'LOST' | 'NEXT_LEVEL' | 'PICKUP_CHOICE' | 'RELIC_SELECTION' | 'ALTAR_INTERACTION' | 'ALTAR_RESULT';
+  gameStatus: 'START_SCREEN' | 'TUTORIAL' | 'PLAYING' | 'COMBAT' | 'CHEST_OPEN' | 'MERCHANT_SHOP' | 'WON' | 'LOST' | 'NEXT_LEVEL' | 'PICKUP_CHOICE' | 'RELIC_SELECTION' | 'ALTAR_INTERACTION' | 'ALTAR_RESULT' | 'EGG_INTERACTION';
   currentEnemy?: Enemy;
   currentPotion?: PotionEntity;
   logs: string[];
@@ -106,6 +124,7 @@ export interface GameState {
   hasMap?: boolean;
   compassPath?: Position[];
   mapPath?: Position[];
+  poisonStatus?: PoisonStatus;
 }
 
 export type StatChoice = 'Ataque' | 'Armadura' | 'Velocidade';
