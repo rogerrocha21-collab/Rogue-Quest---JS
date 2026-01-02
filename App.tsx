@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameState, Position, EntityStats, StatChoice, PotionEntity, Pet, Language, Relic, AltarEffect, PoisonStatus, Trap } from './types';
 import { INITIAL_PLAYER_STATS, MAP_WIDTH, MAP_HEIGHT, TRANSLATIONS, RELICS_POOL, THEME_CONFIG, MAX_LEVELS, BLESSINGS_POOL, CURSES_POOL } from './constants';
@@ -181,12 +182,6 @@ const App: React.FC = () => {
     let invSize = 5;
     let startInventory = inventory || [];
     
-    let startingPet = activePet;
-    // Se novo jogo e corvo desbloqueado, da o corvo
-    if (level === 1 && globalCrow && !startingPet) {
-        startingPet = { type: 'CORVO', name: 'CORVO', hp: 999, maxHp: 999, pos: { x: 0, y: 0 } };
-    }
-    
     setGameState(prev => {
         let finalHasCompass = prev?.hasCompass || false;
         let finalHasMap = prev?.hasMap || false;
@@ -210,18 +205,19 @@ const App: React.FC = () => {
           gameStatus: (level === 1 && !stats) ? 'TUTORIAL' as const : 'PLAYING' as const,
           logs: (level === 1 && !stats) ? [`${finalPlayerName} entrou no abismo.`] : [`Descendo para o nível ${level}`],
           inventory: startInventory, inventorySize: invSize, 
-          activePet: startingPet, 
+          activePet: activePet, 
           activeRelic, language: currentLang, hasUsedAltarInLevel: false, tronModeActive: false, tronTimeLeft: 0, tronTrail: [],
           activeAltarEffect: undefined, keyPath: undefined,
           hasCompass: finalHasCompass, hasMap: finalHasMap, poisonStatus: undefined,
-          isCrowUnlocked: globalCrow
+          isCrowUnlocked: globalCrow,
+          crowPos: globalCrow ? dungeon.playerPos : undefined // Initialize crow pos if unlocked
         };
 
         const guides = updateGuides(tempState, tempState.playerPos);
         tempState.compassPath = guides.compass;
         tempState.mapPath = guides.map;
 
-        // Sync crow pos if exists
+        // Sync pet pos if exists
         if (tempState.activePet) tempState.activePet.pos = tempState.playerPos;
 
         playerPosRef.current = tempState.playerPos;
@@ -246,18 +242,27 @@ const App: React.FC = () => {
         const nextPos = moveQueue[0];
         const oldPos = { ...prev.playerPos };
         
+        // Pet normal (Lobo/Puma) sempre segue o jogador
         let updatedPet = prev.activePet ? { ...prev.activePet, pos: oldPos } : undefined;
         
-        // --- CROW MOVEMENT LOGIC ---
-        // Se o pet for corvo, ele deve priorizar ficar em cima de armadilhas próximas não triggadas
-        if (updatedPet && updatedPet.type === 'CORVO') {
+        // --- CROW MOVEMENT LOGIC (Independente) ---
+        let newCrowPos = nextPos; // Padrão: segue o jogador
+        if (prev.isCrowUnlocked) {
+            // Busca armadilha não acionada e não revelada perto do jogador (ou do corvo atual)
+            // A prioridade do corvo é revelar armadilhas
+            const scanCenter = nextPos;
             const nearbyTrap = prev.traps.find(t => 
                 !t.triggered && 
-                Math.abs(t.x - nextPos.x) < 6 && 
-                Math.abs(t.y - nextPos.y) < 6
+                Math.abs(t.x - scanCenter.x) < 6 && 
+                Math.abs(t.y - scanCenter.y) < 6
             );
+            
             if (nearbyTrap) {
-                updatedPet.pos = { x: nearbyTrap.x, y: nearbyTrap.y };
+                // Se achou armadilha, vai pra ela
+                newCrowPos = { x: nearbyTrap.x, y: nearbyTrap.y };
+            } else {
+                // Se não achou, volta pro jogador
+                newCrowPos = nextPos;
             }
         }
 
@@ -277,29 +282,29 @@ const App: React.FC = () => {
         
         if (prev.keyPos && nextPos.x === prev.keyPos.x && nextPos.y === prev.keyPos.y && !prev.hasKey) {
           playChime(); setMoveQueue(q => q.slice(1)); playerPosRef.current = nextPos;
-          return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos, activePet: updatedPet } as GameState;
+          return { ...prev, hasKey: true, logs: [...prev.logs, t.log_key], playerPos: nextPos, activePet: updatedPet, crowPos: newCrowPos } as GameState;
         }
         
         const potion = prev.potions.find(p => p.x === nextPos.x && p.y === nextPos.y);
         if (potion) { setMoveQueue([]); return { ...prev, gameStatus: 'PICKUP_CHOICE' as const, currentPotion: potion, potions: prev.potions.filter(p => p.id !== potion.id) } as GameState; }
         
         if (prev.merchantPos && nextPos.x === prev.merchantPos.x && nextPos.y === prev.merchantPos.y) {
-          setMoveQueue([]); playerPosRef.current = nextPos; return { ...prev, gameStatus: 'MERCHANT_SHOP' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
+          setMoveQueue([]); playerPosRef.current = nextPos; return { ...prev, gameStatus: 'MERCHANT_SHOP' as const, playerPos: nextPos, activePet: updatedPet, crowPos: newCrowPos } as GameState;
         }
         
         if (prev.altarPos && nextPos.x === prev.altarPos.x && nextPos.y === prev.altarPos.y) {
-          setMoveQueue([]); playerPosRef.current = nextPos; return { ...prev, gameStatus: 'ALTAR_INTERACTION' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
+          setMoveQueue([]); playerPosRef.current = nextPos; return { ...prev, gameStatus: 'ALTAR_INTERACTION' as const, playerPos: nextPos, activePet: updatedPet, crowPos: newCrowPos } as GameState;
         }
 
         // Egg Interaction
         if (prev.eggPos && nextPos.x === prev.eggPos.x && nextPos.y === prev.eggPos.y) {
             setMoveQueue([]); playerPosRef.current = nextPos;
-            return { ...prev, gameStatus: 'EGG_INTERACTION' as const, playerPos: nextPos, activePet: updatedPet } as GameState;
+            return { ...prev, gameStatus: 'EGG_INTERACTION' as const, playerPos: nextPos, activePet: updatedPet, crowPos: newCrowPos } as GameState;
         }
         
         if (nextPos.x === prev.stairsPos.x && nextPos.y === prev.stairsPos.y) {
           if (prev.hasKey && prev.enemiesKilledInLevel > 0) { playChime(); setMoveQueue([]); return { ...prev, gameStatus: 'NEXT_LEVEL' as const } as GameState; }
-          else { setMoveQueue(q => q.slice(1)); playerPosRef.current = nextPos; return { ...prev, logs: [...prev.logs, t.log_locked], playerPos: nextPos, activePet: updatedPet } as GameState; }
+          else { setMoveQueue(q => q.slice(1)); playerPosRef.current = nextPos; return { ...prev, logs: [...prev.logs, t.log_locked], playerPos: nextPos, activePet: updatedPet, crowPos: newCrowPos } as GameState; }
         }
         
         setMoveQueue(q => q.slice(1));
@@ -391,15 +396,13 @@ const App: React.FC = () => {
 
         // --- CROW PASSIVE (Detect Traps) ---
         let updatedTraps = prev.traps.map(t => triggeredTrap && t.id === triggeredTrap.id ? triggeredTrap : t);
-        if (updatedPet && updatedPet.type === 'CORVO') {
+        if (prev.isCrowUnlocked && newCrowPos) {
             let revealedCount = 0;
             updatedTraps = updatedTraps.map(t => {
-                // Crow reveals ANY trap in view range (e.g. 5 tiles), not just 3.
-                // The visual is handled by the crow moving to it.
-                // We mark it revealed so it renders on map.
+                // Crow reveals ANY trap in view range (e.g. 5 tiles) from ITS position
                 if (!t.revealed && !t.triggered) {
-                    const dist = Math.abs(t.x - nextPos.x) + Math.abs(t.y - nextPos.y);
-                    if (dist <= 6) { // Increased range for Crow detection
+                    const dist = Math.abs(t.x - newCrowPos.x) + Math.abs(t.y - newCrowPos.y);
+                    if (dist <= 6) { // Range
                         revealedCount++;
                         return { ...t, revealed: true };
                     }
@@ -416,6 +419,7 @@ const App: React.FC = () => {
             ...prev, 
             playerPos: nextPos, 
             activePet: updatedPet, 
+            crowPos: newCrowPos,
             tronTrail: newTrail, 
             compassPath: guides.compass, 
             mapPath: guides.map,
@@ -647,13 +651,13 @@ const App: React.FC = () => {
           {gameState.gameStatus !== 'WON' && gameState.gameStatus !== 'NEXT_LEVEL' && gameState.gameStatus !== 'RELIC_SELECTION' && gameState.map.length > 0 && (
             <div className="flex flex-col gap-4">
               <GameMap 
-                map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} eggPos={gameState.eggPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} keyPath={gameState.keyPath} onTileClick={handleTileClick} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} 
+                map={gameState.map} theme={gameState.theme} playerPos={gameState.playerPos} enemies={gameState.enemies} chests={gameState.chests} potions={gameState.potions} items={gameState.items} keyPos={gameState.keyPos} merchantPos={gameState.merchantPos} altarPos={gameState.altarPos} eggPos={gameState.eggPos} hasKey={gameState.hasKey} stairsPos={gameState.stairsPos} activePet={gameState.activePet} isCrowUnlocked={gameState.isCrowUnlocked} crowPos={gameState.crowPos} keyPath={gameState.keyPath} onTileClick={handleTileClick} tronModeActive={gameState.tronModeActive} tronTrail={gameState.tronTrail} 
                 ritualDarkness={gameState.activeAltarEffect?.id === 'ritual_darkness'}
                 compassPath={gameState.compassPath} mapPath={gameState.mapPath}
                 poisonStatus={gameState.poisonStatus}
                 traps={gameState.traps}
               />
-              <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} poisonStatus={gameState.poisonStatus} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}
+              <HUD level={gameState.level} stats={gameState.playerStats} logs={gameState.logs} hasKey={gameState.hasKey} kills={gameState.enemiesKilledInLevel} gold={gameState.gold} playerName={gameState.playerName} activePet={gameState.activePet} isCrowUnlocked={gameState.isCrowUnlocked} language={currentLang} inventory={gameState.inventory} inventorySize={gameState.inventorySize} activeRelic={gameState.activeRelic} activeAltarEffect={gameState.activeAltarEffect} poisonStatus={gameState.poisonStatus} onUsePotion={usePotionFromInventory} tronModeActive={gameState.tronModeActive} tronTimeLeft={gameState.tronTimeLeft}
                 hasCompass={gameState.hasCompass} hasMap={gameState.hasMap} enemiesCount={gameState.enemies.length}
               />
             </div>
@@ -714,7 +718,7 @@ const App: React.FC = () => {
         <EggStoryModal 
           language={currentLang} 
           onAccept={() => {
-             // Unlock Crow permanently
+             // Unlock Crow permanently without replacing active pet
              localStorage.setItem('rq_crow_unlocked', 'true');
              setGameState(prev => {
                  if (!prev) return null;
@@ -722,7 +726,7 @@ const App: React.FC = () => {
                      ...prev,
                      isCrowUnlocked: true,
                      eggPos: undefined, // Remove egg from map
-                     activePet: { type: 'CORVO', name: 'CORVO', hp: 999, maxHp: 999, pos: prev.playerPos }, // Add Crow Pet
+                     crowPos: prev.playerPos, // Spawn crow at player location
                      gameStatus: 'PLAYING'
                  };
              });

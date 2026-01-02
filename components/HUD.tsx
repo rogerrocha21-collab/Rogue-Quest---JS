@@ -13,6 +13,7 @@ interface HUDProps {
   gold: number;
   playerName: string;
   activePet?: Pet;
+  isCrowUnlocked?: boolean;
   language?: Language;
   inventory: PotionEntity[];
   inventorySize: number;
@@ -28,7 +29,7 @@ interface HUDProps {
 }
 
 const HUD: React.FC<HUDProps> = ({ 
-  level, stats, logs, hasKey, kills, gold, playerName, activePet, language = 'PT', 
+  level, stats, logs, hasKey, kills, gold, playerName, activePet, isCrowUnlocked, language = 'PT', 
   inventory, inventorySize, activeRelic, activeAltarEffect, poisonStatus, onUsePotion, 
   tronModeActive, tronTimeLeft, hasCompass, hasMap, enemiesCount 
 }) => {
@@ -83,6 +84,11 @@ const HUD: React.FC<HUDProps> = ({
             {activePet && (
               <div className="flex items-center gap-1 bg-orange-950/20 px-2 py-0.5 rounded-full border border-orange-500/20 text-orange-400">
                 <Icon.Wolf width={12} height={12} /> <span className="text-[9px] font-bold">{activePet.hp}</span>
+              </div>
+            )}
+            {isCrowUnlocked && (
+              <div className="flex items-center gap-1 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-zinc-600/30 text-zinc-400" title="Corvo Vigilante">
+                <Icon.Corvo width={12} height={12} />
               </div>
             )}
             <div className="flex items-center gap-1 bg-yellow-950/20 px-2 py-0.5 rounded-full border border-yellow-500/20 ml-auto">

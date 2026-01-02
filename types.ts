@@ -100,6 +100,7 @@ export interface GameState {
   keyPos?: Position;
   eggPos?: Position; // Posição do Ovo Misterioso
   isCrowUnlocked: boolean; // Persistência do Corvo
+  crowPos?: Position; // Posição independente do Corvo
   hasKey: boolean;
   enemiesKilledInLevel: number;
   stairsPos: Position;

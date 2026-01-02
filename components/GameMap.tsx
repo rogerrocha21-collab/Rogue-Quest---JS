@@ -22,6 +22,8 @@ interface GameMapProps {
   tronModeActive?: boolean;
   tronTrail?: Position[];
   activePet?: Pet;
+  isCrowUnlocked?: boolean;
+  crowPos?: Position;
   ritualDarkness?: boolean;
   keyPath?: Position[];
   compassPath?: Position[];
@@ -36,7 +38,7 @@ const VIEW_H = 13;
 const GameMap: React.FC<GameMapProps> = ({ 
   map, theme, playerPos, enemies, chests, potions, items, traps = [],
   keyPos, merchantPos, altarPos, eggPos, hasKey, stairsPos, 
-  tronModeActive, tronTrail = [], activePet, 
+  tronModeActive, tronTrail = [], activePet, isCrowUnlocked, crowPos,
   ritualDarkness, keyPath = [], compassPath = [], mapPath = [], poisonStatus, onTileClick 
 }) => {
   const config = THEME_CONFIG[theme] || THEME_CONFIG.VOID;
@@ -53,9 +55,15 @@ const GameMap: React.FC<GameMapProps> = ({
     if (!map[y] || map[y][x] === undefined) return null;
 
     const isPlayer = x === playerPos.x && y === playerPos.y;
-    // Lógica visual do Pet: Se for Corvo, ele já "voa" para a armadilha na lógica do App.tsx, então só renderizamos onde activePet.pos está.
-    const isPet = activePet && x === activePet.pos.x && y === activePet.pos.y && (!isPlayer || activePet.type === 'CORVO');
     
+    // Pet normal (Lobo, Puma, etc)
+    const isPet = activePet && x === activePet.pos.x && y === activePet.pos.y && !isPlayer;
+    
+    // Corvo (independente)
+    // Renderiza sempre que estiver na posição, com lógica de visualização ajustada no CSS
+    const isCrow = isCrowUnlocked && crowPos && x === crowPos.x && y === crowPos.y;
+    const isCrowSeparated = isCrow && (crowPos.x !== playerPos.x || crowPos.y !== playerPos.y);
+
     const enemy = enemies.find(e => e.x === x && e.y === y);
     const chest = chests.find(c => c.x === x && c.y === y);
     const potion = potions.find(p => p.x === x && p.y === y);
@@ -94,11 +102,32 @@ const GameMap: React.FC<GameMapProps> = ({
           <span className={`${playerColorClass} drop-shadow-[0_0_15px_rgba(250,204,21,1)] animate-player-bounce z-20`}>
             {tronModeActive ? <Icon.Horse /> : <Icon.Player />}
           </span>
-        ) : isPet ? (
-          <span className={`${TILE_COLORS.PET} animate-pet-wiggle z-30 scale-90 ${activePet.type === 'CORVO' ? 'text-zinc-400 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : ''}`}>
-            {activePet.type === 'LOBO' ? <Icon.Wolf /> : activePet.type === 'PUMA' ? <Icon.Puma /> : <Icon.Corvo />}
+        ) : null}
+
+        {isPet && !isPlayer && (
+          <span className={`absolute inset-0 flex items-center justify-center ${TILE_COLORS.PET} animate-pet-wiggle z-15 scale-90`}>
+            {activePet?.type === 'LOBO' ? <Icon.Wolf /> : activePet?.type === 'PUMA' ? <Icon.Puma /> : <Icon.Wolf />}
           </span>
-        ) : enemy ? (
+        )}
+
+        {isCrow && (
+           <span className={`absolute inset-0 flex items-center justify-center transition-all duration-500 z-20 
+             ${isCrowSeparated 
+                ? 'text-indigo-200 drop-shadow-[0_0_10px_rgba(129,140,248,0.9)]' 
+                : 'text-zinc-400 drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] animate-pet-wiggle'}
+             ${(isPet || isPlayer) && !isCrowSeparated ? 'translate-x-2 -translate-y-2 scale-75' : 'scale-90'}
+           `}>
+             <Icon.Corvo />
+             {isCrowSeparated && (
+                <>
+                  <span className="absolute inset-0 bg-indigo-400/20 rounded-full animate-ping"></span>
+                  <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse shadow-[0_0_5px_#818cf8]"></span>
+                </>
+             )}
+           </span>
+        )}
+
+        {enemy ? (
           <span className={`${TILE_COLORS.ENEMY} drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] z-10`}><Icon.Enemy /></span>
         ) : isKey ? (
           <span className={`${TILE_COLORS.KEY} animate-bounce drop-shadow-[0_0_12px_rgba(234,179,8,1)] z-10`}><Icon.Key /></span>
