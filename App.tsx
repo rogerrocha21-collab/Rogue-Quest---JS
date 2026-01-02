@@ -246,7 +246,7 @@ const App: React.FC = () => {
         let updatedPet = prev.activePet ? { ...prev.activePet, pos: oldPos } : undefined;
         
         // --- CROW MOVEMENT LOGIC (Independente) ---
-        let newCrowPos = nextPos; // Padrão: segue o jogador
+        let newCrowPos = oldPos; // Padrão: segue o jogador ATRÁS (como o pet), criando distância
         if (prev.isCrowUnlocked) {
             // Busca armadilha não acionada e não revelada perto do jogador (ou do corvo atual)
             // A prioridade do corvo é revelar armadilhas
@@ -258,11 +258,11 @@ const App: React.FC = () => {
             );
             
             if (nearbyTrap) {
-                // Se achou armadilha, vai pra ela
+                // Se achou armadilha, vai pra ela (sai do ombro/atrás do jogador)
                 newCrowPos = { x: nearbyTrap.x, y: nearbyTrap.y };
             } else {
-                // Se não achou, volta pro jogador
-                newCrowPos = nextPos;
+                // Se não achou, mantém comportamento de seguir (usa oldPos pra não ficar grudado)
+                newCrowPos = oldPos;
             }
         }
 
@@ -510,28 +510,42 @@ const App: React.FC = () => {
         used = true; return { ...prev, activeAltarEffect: undefined, inventory: newInv } as GameState;
       }
 
-      const pot = prev.inventory[idx];
-      const stats = { ...prev.playerStats };
-      let boost = pot.percent;
-      if (prev.activeRelic?.id === 'alch') boost += 5;
-      if (prev.activeAltarEffect?.id === 'profane_thirst') boost -= 10;
-      
-      const heal = Math.floor(stats.maxHp * (boost / 100));
-      stats.hp = Math.min(stats.maxHp, stats.hp + heal);
-      
+      const item = prev.inventory[idx];
       const newInv = [...prev.inventory];
-      const consumed = prev.activeAltarEffect?.id !== 'accepted_offering' && !(prev.activeRelic?.id === 'save' && Math.random() < 0.05);
-      if (consumed) {
-        newInv.splice(idx, 1);
+
+      if (item.type === 'ANTIDOTE') {
+         // ANTIDOTE LOGIC
+         newInv.splice(idx, 1);
+         used = true;
+         return {
+            ...prev,
+            inventory: newInv,
+            poisonStatus: undefined,
+            logs: [...prev.logs, t.cured]
+         } as GameState;
+      } else {
+          // POTION LOGIC
+          const stats = { ...prev.playerStats };
+          let boost = item.percent;
+          if (prev.activeRelic?.id === 'alch') boost += 5;
+          if (prev.activeAltarEffect?.id === 'profane_thirst') boost -= 10;
+          
+          const heal = Math.floor(stats.maxHp * (boost / 100));
+          stats.hp = Math.min(stats.maxHp, stats.hp + heal);
+          
+          const consumed = prev.activeAltarEffect?.id !== 'accepted_offering' && !(prev.activeRelic?.id === 'save' && Math.random() < 0.05);
+          if (consumed) {
+            newInv.splice(idx, 1);
+          }
+          
+          used = true;
+          return { 
+            ...prev, 
+            playerStats: stats, 
+            inventory: newInv, 
+            activeAltarEffect: prev.activeAltarEffect?.id === 'accepted_offering' ? undefined : prev.activeAltarEffect 
+          } as GameState;
       }
-      
-      used = true;
-      return { 
-        ...prev, 
-        playerStats: stats, 
-        inventory: newInv, 
-        activeAltarEffect: prev.activeAltarEffect?.id === 'accepted_offering' ? undefined : prev.activeAltarEffect 
-      } as GameState;
     });
     return used;
   };
@@ -818,6 +832,7 @@ const App: React.FC = () => {
           gold={gameState.gold} level={gameState.level} hasPet={!!gameState.activePet} 
           language={currentLang} activeAltarEffect={gameState.activeAltarEffect} 
           hasCompass={gameState.hasCompass} hasMap={gameState.hasMap}
+          inventorySize={gameState.inventorySize}
           onBuyItem={(item) => {
             setGameState(prev => {
               if(!prev) return prev;
@@ -854,16 +869,41 @@ const App: React.FC = () => {
                  return { ...tempState, compassPath: guides.compass, mapPath: guides.map } as GameState;
              });
           }}
-          onBuyAntidote={() => {
+          onBuyAntidote={(choice) => {
              setGameState(prev => {
                  if (!prev) return prev;
-                 return { 
-                     ...prev, 
-                     gold: prev.gold - 50, 
-                     poisonStatus: undefined, 
-                     logs: [...prev.logs, t.cured] 
-                 } as GameState;
+                 if (choice === 'use') {
+                     return { 
+                         ...prev, 
+                         gold: prev.gold - 50, 
+                         poisonStatus: undefined, 
+                         logs: [...prev.logs, t.cured] 
+                     } as GameState;
+                 } else {
+                     const antidoteItem: PotionEntity = {
+                         id: `antidote-${Date.now()}`,
+                         percent: 0,
+                         type: 'ANTIDOTE',
+                         x: 0, y: 0
+                     };
+                     return {
+                         ...prev,
+                         gold: prev.gold - 50,
+                         inventory: [...prev.inventory, antidoteItem]
+                     } as GameState;
+                 }
              });
+          }}
+          onBuyInventorySlot={() => {
+              setGameState(prev => {
+                  if (!prev) return prev;
+                  if (prev.gold < 250 || prev.inventorySize >= 50) return prev;
+                  return {
+                      ...prev,
+                      gold: prev.gold - 250,
+                      inventorySize: Math.min(50, prev.inventorySize + 5)
+                  } as GameState;
+              });
           }}
           onBuyPet={(type) => {
             const pet: Pet = { type, name: type, hp: 50, maxHp: 50, pos: { ...playerPosRef.current } };

@@ -269,8 +269,9 @@ export const CombatModal: React.FC<CombatModalProps> = ({
         {!isDone && inventory.length > 0 && (
           <div className="flex justify-center gap-2 p-3 bg-[#111] rounded-2xl border border-[#222]">
             {inventory.map((pot, i) => (
-              <button key={i} onClick={() => handleUsePotion(i)} className="flex items-center gap-2 px-3 py-1 bg-pink-950/10 border border-pink-500/20 rounded-xl text-pink-500 hover:bg-pink-900/20 transition-all">
-                <Icon.Potion width={14} height={14} /> <span className="text-[9px] font-black">{pot.percent}%</span>
+              <button key={i} onClick={() => handleUsePotion(i)} className={`flex items-center gap-2 px-3 py-1 ${pot.type === 'ANTIDOTE' ? 'bg-green-950/10 border-green-500/20 text-green-500' : 'bg-pink-950/10 border-pink-500/20 text-pink-500'} border rounded-xl hover:opacity-80 transition-all`}>
+                {pot.type === 'ANTIDOTE' ? <Icon.Antidote width={14} height={14} /> : <Icon.Potion width={14} height={14} />} 
+                <span className="text-[9px] font-black">{pot.type === 'ANTIDOTE' ? 'CURA' : `${pot.percent}%`}</span>
               </button>
             ))}
           </div>
@@ -286,14 +287,14 @@ export const CombatModal: React.FC<CombatModalProps> = ({
 };
 
 export const MerchantShopModal: React.FC<{ 
-  gold: number, level: number, hasPet: boolean, language: Language, activeAltarEffect?: AltarEffect, 
+  gold: number, level: number, hasPet: boolean, language: Language, activeAltarEffect?: AltarEffect, inventorySize: number,
   onBuyItem: (item: ItemEntity) => void, onBuyPotion: (pot: PotionEntity, choice: 'use' | 'store') => void, 
   onRentTron: () => void, onBuyPet: (type: Pet['type']) => void, onClose: () => void,
   hasCompass?: boolean, hasMap?: boolean, onBuyCompass?: () => void, onBuyMap?: () => void,
-  onBuyAntidote: () => void
+  onBuyAntidote: (choice: 'use' | 'store') => void, onBuyInventorySlot: () => void
 }> = ({
-  gold, level, hasPet, language, activeAltarEffect, onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose,
-  hasCompass, hasMap, onBuyCompass, onBuyMap, onBuyAntidote
+  gold, level, hasPet, language, activeAltarEffect, inventorySize, onBuyItem, onBuyPotion, onRentTron, onBuyPet, onClose,
+  hasCompass, hasMap, onBuyCompass, onBuyMap, onBuyAntidote, onBuyInventorySlot
 }) => {
   const t = TRANSLATIONS[language];
   const discount = activeAltarEffect?.id === 'merchant_blessing' ? 0.8 : 1.0;
@@ -329,6 +330,18 @@ export const MerchantShopModal: React.FC<{
             </div>
             <span className="text-[11px] text-yellow-500 font-black">25 G</span>
           </button>
+
+          {/* INVENTORY EXPANSION (Level 20+) */}
+          {level >= 20 && (
+            <button disabled={gold < 250 || inventorySize >= 50} onClick={onBuyInventorySlot} className="w-full p-4 bg-purple-950/10 border border-purple-500/20 rounded-2xl flex items-center gap-4 hover:bg-purple-900/10 transition-all disabled:opacity-30">
+                <div className="text-purple-500"><Icon.Backpack width={24} height={24}/></div>
+                <div className="flex-1 text-left">
+                <p className="text-[10px] font-black text-white uppercase">Mochila Expandida (+5 Slots)</p>
+                <p className="text-[8px] text-purple-600 font-bold uppercase">{inventorySize >= 50 ? 'MÁXIMO ATINGIDO' : 'Aumenta capacidade do inventário'}</p>
+                </div>
+                {inventorySize < 50 ? <span className="text-[11px] text-yellow-500 font-black">250 G</span> : <span className="text-[8px] text-green-500 font-bold">MAX</span>}
+            </button>
+          )}
           
           <div className="grid grid-cols-2 gap-3">
              <button disabled={gold < 90 || hasCompass} onClick={onBuyCompass} className={`p-4 bg-cyan-950/10 border border-cyan-500/20 rounded-2xl flex items-center gap-3 transition-all ${hasCompass ? 'opacity-50' : 'hover:bg-cyan-900/10'} disabled:opacity-30`}>
@@ -349,15 +362,23 @@ export const MerchantShopModal: React.FC<{
              </button>
           </div>
 
-          <div className="w-full p-4 bg-green-950/10 border border-green-500/20 rounded-2xl flex items-center gap-4 hover:bg-green-900/10 transition-all">
-             <div className="text-green-500"><Icon.Antidote width={24} height={24}/></div>
-             <div className="flex-1 text-left">
-               <p className="text-[10px] font-black text-white uppercase">{t.antidote_name}</p>
-               <p className="text-[8px] text-green-600 font-bold uppercase">{t.antidote_desc}</p>
+          <div className="p-3 bg-green-950/10 border border-green-500/20 rounded-2xl flex flex-col gap-2">
+             <div className="flex items-center gap-3">
+                <div className="text-green-500"><Icon.Antidote width={24} height={24}/></div>
+                <div className="flex-1 text-left">
+                    <p className="text-[10px] font-black text-white uppercase">{t.antidote_name}</p>
+                    <p className="text-[8px] text-green-600 font-bold uppercase">{t.antidote_desc}</p>
+                </div>
+                <span className="text-[11px] text-yellow-500 font-black">50 G</span>
              </div>
-             <button onClick={onBuyAntidote} disabled={gold < 50} className="px-4 py-2 bg-green-700 hover:bg-green-600 text-white font-black text-[10px] rounded-xl uppercase disabled:opacity-30">
-               50 G
-             </button>
+             <div className="flex gap-2 w-full">
+                <button onClick={() => onBuyAntidote('use')} disabled={gold < 50} className="flex-1 py-1.5 bg-green-700 hover:bg-green-600 text-white font-black text-[9px] rounded-xl uppercase disabled:opacity-30">
+                  USAR
+                </button>
+                <button onClick={() => onBuyAntidote('store')} disabled={gold < 50} className="flex-1 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black text-[9px] rounded-xl uppercase disabled:opacity-30">
+                  GUARDAR
+                </button>
+             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

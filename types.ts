@@ -43,6 +43,7 @@ export interface PotionEntity extends Position {
   id: string;
   percent: number;
   price?: number;
+  type?: 'HEAL' | 'ANTIDOTE'; // Added type to distinguish items
 }
 
 export interface Pet {

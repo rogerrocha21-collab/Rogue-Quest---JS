@@ -60,8 +60,8 @@ const GameMap: React.FC<GameMapProps> = ({
     const isPet = activePet && x === activePet.pos.x && y === activePet.pos.y && !isPlayer;
     
     // Corvo (independente)
-    // Renderiza sempre que estiver na posição, com lógica de visualização ajustada no CSS
     const isCrow = isCrowUnlocked && crowPos && x === crowPos.x && y === crowPos.y;
+    // Verifica se está "longe" do jogador (caçando armadilha)
     const isCrowSeparated = isCrow && (crowPos.x !== playerPos.x || crowPos.y !== playerPos.y);
 
     const enemy = enemies.find(e => e.x === x && e.y === y);
@@ -104,18 +104,19 @@ const GameMap: React.FC<GameMapProps> = ({
           </span>
         ) : null}
 
+        {/* PET - Se estiver junto com o Corvo, fica no canto inferior esquerdo */}
         {isPet && !isPlayer && (
-          <span className={`absolute inset-0 flex items-center justify-center ${TILE_COLORS.PET} animate-pet-wiggle z-15 scale-90`}>
+          <span className={`absolute ${isCrow ? 'bottom-0 left-0 scale-75' : 'inset-0 flex items-center justify-center scale-90'} ${TILE_COLORS.PET} animate-pet-wiggle z-15`}>
             {activePet?.type === 'LOBO' ? <Icon.Wolf /> : activePet?.type === 'PUMA' ? <Icon.Puma /> : <Icon.Wolf />}
           </span>
         )}
 
+        {/* CORVO */}
         {isCrow && (
-           <span className={`absolute inset-0 flex items-center justify-center transition-all duration-500 z-20 
+           <span className={`absolute z-20 transition-all duration-500
              ${isCrowSeparated 
-                ? 'text-indigo-200 drop-shadow-[0_0_10px_rgba(129,140,248,0.9)]' 
-                : 'text-zinc-400 drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] animate-pet-wiggle'}
-             ${(isPet || isPlayer) && !isCrowSeparated ? 'translate-x-2 -translate-y-2 scale-75' : 'scale-90'}
+                ? 'inset-0 flex items-center justify-center text-indigo-200 drop-shadow-[0_0_10px_rgba(129,140,248,0.9)] scale-90' 
+                : (isPet ? '-top-2 -right-2 scale-75' : 'inset-0 flex items-center justify-center scale-90 -translate-y-2') + ' text-zinc-400 drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] animate-pet-wiggle'}
            `}>
              <Icon.Corvo />
              {isCrowSeparated && (

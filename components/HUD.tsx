@@ -131,11 +131,15 @@ const HUD: React.FC<HUDProps> = ({
         <div className="bg-zinc-900 border border-zinc-700 p-3 rounded-xl animate-in slide-in-from-top-2">
           <div className="grid grid-cols-5 gap-2">
             {Array.from({ length: inventorySize }).map((_, i) => (
-              <div key={i} className={`h-10 border-2 rounded-lg flex items-center justify-center transition-all ${inventory[i] ? 'bg-pink-900/10 border-pink-500/30' : 'bg-black/40 border-zinc-800/50 border-dashed'}`}>
+              <div key={i} className={`h-10 border-2 rounded-lg flex items-center justify-center transition-all ${
+                inventory[i] 
+                  ? (inventory[i].type === 'ANTIDOTE' ? 'bg-green-900/10 border-green-500/30' : 'bg-pink-900/10 border-pink-500/30') 
+                  : 'bg-black/40 border-zinc-800/50 border-dashed'
+              }`}>
                 {inventory[i] ? (
-                  <button onClick={() => onUsePotion(i)} className="text-pink-400 hover:scale-110 flex flex-col items-center">
-                    <Icon.Potion />
-                    <span className="text-[7px] font-bold">+{inventory[i].percent}%</span>
+                  <button onClick={() => onUsePotion(i)} className={`${inventory[i].type === 'ANTIDOTE' ? 'text-green-400' : 'text-pink-400'} hover:scale-110 flex flex-col items-center`}>
+                    {inventory[i].type === 'ANTIDOTE' ? <Icon.Antidote width={16} height={16} /> : <Icon.Potion />}
+                    <span className="text-[7px] font-bold">{inventory[i].type === 'ANTIDOTE' ? 'CURA' : `+${inventory[i].percent}%`}</span>
                   </button>
                 ) : <span className="text-zinc-800 text-[10px]">{i + 1}</span>}
               </div>
