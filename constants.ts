@@ -14,6 +14,28 @@ export const INITIAL_PLAYER_STATS = {
   speed: 12,
 };
 
+export const BIOME_MUSIC_URLS: Record<LevelTheme | 'BOSS', string> = {
+  VOID: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/abismo.mp3',
+  CATACOMBS: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/catacumbas_alagadas.mp3',
+  CAVE: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/cavernas.mp3',
+  HIVE: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/comeia_profunda.mp3',
+  MECHANICAL: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/complexo_mecanico.mp3',
+  DESERT: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/dunas.mp3',
+  FOREST: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/floresta.mp3',
+  FURNACE: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/fornalha_abissal.mp3',
+  MATRIX: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/matrix.mp3',
+  OSSUARY: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/ossuario.mp3',
+  SWAMP: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/pantano_toxico.mp3',
+  SNOW: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/picos_de_gelo.mp3',
+  ASTRAL: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/plano_astral.mp3',
+  RUINS: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/ruinas_antigas.mp3',
+  TEMPLE: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/templo_esquecido.mp3',
+  CORRUPTED: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/zona_corrompida.mp3',
+  CHAOS: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/zona_do_caos.mp3',
+  INFERNO: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/zona_infernal.mp3',
+  BOSS: 'https://pub-2a8e52d1971240ee8051b19ae39b05ff.r2.dev/boss_final.mp3'
+};
+
 export const POISONOUS_ENEMIES = [
   'Aranha Cavernosa', 
   'Escorpião Gigante', 

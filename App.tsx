@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameState, Position, EntityStats, StatChoice, PotionEntity, Pet, Language, Relic, AltarEffect, PoisonStatus, Trap } from './types';
-import { INITIAL_PLAYER_STATS, MAP_WIDTH, MAP_HEIGHT, TRANSLATIONS, RELICS_POOL, THEME_CONFIG, MAX_LEVELS, BLESSINGS_POOL, CURSES_POOL } from './constants';
+import { INITIAL_PLAYER_STATS, MAP_WIDTH, MAP_HEIGHT, TRANSLATIONS, RELICS_POOL, THEME_CONFIG, MAX_LEVELS, BLESSINGS_POOL, CURSES_POOL, BIOME_MUSIC_URLS } from './constants';
 import { generateDungeon, findDungeonPath } from './utils/dungeon';
 import GameMap from './components/GameMap';
 import HUD from './components/HUD';
@@ -16,15 +16,46 @@ const App: React.FC = () => {
   const [moveQueue, setMoveQueue] = useState<Position[]>([]);
   const [isNewGameMode, setIsNewGameMode] = useState(false);
   const [inventoryFullAlert, setInventoryFullAlert] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   const audioContext = useRef<AudioContext | null>(null);
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
   const currentSongIdx = useRef<number>(0);
   const isMutedRef = useRef(false);
   const playerPosRef = useRef<Position>({ x: 0, y: 0 });
 
   useEffect(() => {
     isMutedRef.current = isMuted;
+    if (bgmRef.current) {
+      bgmRef.current.muted = isMuted;
+    }
   }, [isMuted]);
+
+  // BGM Logic
+  useEffect(() => {
+    if (!gameState) return;
+
+    if (!bgmRef.current) {
+        bgmRef.current = new Audio();
+        bgmRef.current.loop = true;
+        bgmRef.current.volume = 0.4;
+        bgmRef.current.muted = isMuted;
+    }
+
+    if (gameState.gameStatus === 'PLAYING') {
+        const isBossLevel = gameState.level % 10 === 0;
+        const targetUrl = isBossLevel ? BIOME_MUSIC_URLS.BOSS : BIOME_MUSIC_URLS[gameState.theme];
+        
+        // Se a música alvo for diferente da atual ou se estiver pausada, troca/toca
+        if (bgmRef.current.src !== targetUrl || bgmRef.current.paused) {
+            bgmRef.current.src = targetUrl;
+            bgmRef.current.play().catch(e => console.log("Audio play failed (user interaction needed):", e));
+        }
+    } else if (gameState.gameStatus === 'NEXT_LEVEL' || gameState.gameStatus === 'WON' || gameState.gameStatus === 'LOST' || gameState.gameStatus === 'START_SCREEN') {
+        // Pausa música em menus/transições críticas
+        bgmRef.current.pause();
+    }
+  }, [gameState?.gameStatus, gameState?.theme, gameState?.level]);
 
   useEffect(() => {
     if (!gameState || !gameState.tronModeActive) return;
@@ -155,16 +186,7 @@ const App: React.FC = () => {
   const startMusic = () => {
     if (audioContext.current) return;
     audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const tracks = [[261.63, 311.13, 349.23, 392.00, 466.16], [196.00, 220.00, 246.94, 261.63, 293.66], [329.63, 392.00, 440.00, 523.25, 659.25]];
-    let step = 0;
-    currentSongIdx.current = Math.floor(Math.random() * tracks.length);
-    setInterval(() => {
-      if (isMutedRef.current || !audioContext.current) return;
-      const track = tracks[currentSongIdx.current % tracks.length];
-      playSound(track[step % track.length], step % 8 < 4 ? 'sawtooth' : 'square', 0.15, 0.005);
-      step++;
-      if (step % 64 === 0) currentSongIdx.current++;
-    }, 180);
+    // BGM starts via Effect Hook when status changes to PLAYING
   };
 
   const initLevel = useCallback((level: number, stats?: EntityStats, gold?: number, name?: string, activePet?: Pet, activeRelic?: Relic, inventory?: PotionEntity[]) => {
@@ -232,6 +254,22 @@ const App: React.FC = () => {
     const path = findDungeonPath(playerPosRef.current, { x: tx, y: ty }, gameState.map, gameState.enemies);
     if (path && path.length > 0) setMoveQueue(path);
     else setMoveQueue([]);
+  };
+
+  const handleLevelTransition = (isNextLevel: boolean) => {
+      // Fade Out -> Change State
+      setIsTransitioning(true);
+      setTimeout(() => {
+          if (isNextLevel) {
+              setGameState(prev => prev ? { ...prev, gameStatus: 'NEXT_LEVEL' as const } as GameState : null);
+          } else {
+              // Proceed button clicked
+              initLevel(gameState!.level + 1, gameState!.playerStats, gameState!.gold, gameState!.playerName, gameState!.activePet, gameState!.activeRelic, gameState!.inventory);
+          }
+          // The Fade In will happen because initLevel/setGameState triggers re-render, 
+          // and we set transition false after a short delay to allow "mounting"
+          setTimeout(() => setIsTransitioning(false), 100);
+      }, 500); // Wait for fade out animation
   };
 
   useEffect(() => {
@@ -303,8 +341,17 @@ const App: React.FC = () => {
         }
         
         if (nextPos.x === prev.stairsPos.x && nextPos.y === prev.stairsPos.y) {
-          if (prev.hasKey && prev.enemiesKilledInLevel > 0) { playChime(); setMoveQueue([]); return { ...prev, gameStatus: 'NEXT_LEVEL' as const } as GameState; }
-          else { setMoveQueue(q => q.slice(1)); playerPosRef.current = nextPos; return { ...prev, logs: [...prev.logs, t.log_locked], playerPos: nextPos, activePet: updatedPet, crowPos: newCrowPos } as GameState; }
+          if (prev.hasKey && prev.enemiesKilledInLevel > 0) { 
+              playChime(); 
+              setMoveQueue([]); 
+              // Trigger Transition Logic instead of direct state set
+              handleLevelTransition(true);
+              return prev; // Return prev, effect will update state after delay
+          } else { 
+              setMoveQueue(q => q.slice(1)); 
+              playerPosRef.current = nextPos; 
+              return { ...prev, logs: [...prev.logs, t.log_locked], playerPos: nextPos, activePet: updatedPet, crowPos: newCrowPos } as GameState; 
+          }
         }
         
         setMoveQueue(q => q.slice(1));
@@ -598,7 +645,7 @@ const App: React.FC = () => {
   if (!gameState) return null;
 
   return (
-    <div className="bg-black min-h-screen text-zinc-300 font-sans selection:bg-red-500/30 overflow-x-hidden">
+    <div className={`bg-black min-h-screen text-zinc-300 font-sans selection:bg-red-500/30 overflow-x-hidden transition-opacity duration-500 ${isTransitioning ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
       {gameState.gameStatus === 'START_SCREEN' ? (
         <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center p-8 bg-black">
           <div className="max-w-md w-full text-center space-y-12 animate-in fade-in zoom-in-95 duration-700">
@@ -939,7 +986,7 @@ const App: React.FC = () => {
       {gameState.gameStatus === 'NEXT_LEVEL' && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-8 space-y-12 animate-in fade-in">
           <h2 className="text-4xl md:text-5xl font-black text-red-600 uppercase tracking-tighter">DESCENDO MAIS FUNDO...</h2>
-          <button onClick={() => initLevel(gameState.level + 1, gameState.playerStats, gameState.gold, gameState.playerName, gameState.activePet, gameState.activeRelic, gameState.inventory)} className="px-12 py-6 bg-white text-black font-black rounded-2xl uppercase tracking-[0.2em] text-lg hover:bg-zinc-200 shadow-2xl transition-all active:scale-95">Prosseguir</button>
+          <button onClick={() => handleLevelTransition(false)} className="px-12 py-6 bg-white text-black font-black rounded-2xl uppercase tracking-[0.2em] text-lg hover:bg-zinc-200 shadow-2xl transition-all active:scale-95">Prosseguir</button>
         </div>
       )}
 
